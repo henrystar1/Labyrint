@@ -1,0 +1,3183 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Die Wandernden Gänge – 3D-Labyrinth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Alegreya+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* =========================================================================
+   style.css – Oberfläche im Look alter Steingänge.
+   Schiefer als Grund, Messing als Akzent. Große Ziele für Finger, alles
+   Wichtige innerhalb der sicheren Bereiche eines iPads.
+   ========================================================================= */
+:root {
+  --slate: #14161f;
+  --ink: #0a0b11;
+  --brass: #d7a94b;
+  --brass-lt: #f0d590;
+  --parch: #ece0c6;
+  --muted: #a49b88;
+  --line: #4a4335;
+  --moss: #6fbf8a;
+  --ember: #e0764a;
+  --shadow: 0 18px 44px rgba(0, 0, 0, .6);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; height: 100%; overflow: hidden;
+  background: var(--slate); color: var(--parch);
+  font-family: 'Alegreya Sans', system-ui, -apple-system, sans-serif;
+  font-size: 17px; line-height: 1.45;
+  -webkit-user-select: none; user-select: none;
+  overscroll-behavior: none;
+}
+
+#canvas-wrap { position: fixed; inset: 0; }
+#canvas-wrap canvas { display: block; touch-action: none; }
+.hidden { display: none !important; }
+
+h1, h2, h3 { font-family: 'Cinzel', Georgia, serif; margin: 0 0 .4rem; line-height: 1.08; }
+h1 { font-size: clamp(2rem, 5.2vw, 3.4rem); }
+h2 { font-size: 1.6rem; }
+h3 { font-size: .95rem; color: var(--muted); font-weight: 500; letter-spacing: .02em; }
+.kicker { color: var(--brass); font-family: 'Cinzel', serif; margin: 0 0 .3rem; font-size: .9rem; }
+.lede { color: #c4bcaa; margin: 0 0 1rem; max-width: 52ch; }
+
+/* ------------------------------- Overlays -------------------------------- */
+.overlay {
+  position: fixed; inset: 0; z-index: 60;
+  display: grid; place-items: center;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
+  background: radial-gradient(130% 90% at 50% -10%, rgba(70, 54, 30, .55), rgba(6, 7, 11, .95));
+  overflow: auto;
+}
+.panel {
+  width: min(620px, 100%);
+  background: linear-gradient(180deg, rgba(44, 39, 32, .97), rgba(19, 21, 29, .98));
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 235, 190, .09);
+  padding: clamp(1.3rem, 3.5vw, 2.2rem);
+}
+.panel.center { text-align: center; }
+.panel.center .lede { margin-inline: auto; }
+pre#error-text {
+  white-space: pre-wrap; word-break: break-word;
+  background: #0c0e14; border: 1px solid var(--line);
+  padding: .8rem; font-size: .8rem; color: #ffbfa8; max-height: 40vh; overflow: auto;
+}
+
+/* ------------------------------- Startmenü ------------------------------- */
+.menu {
+  width: min(920px, 100%);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 1.2rem;
+  background: linear-gradient(180deg, rgba(44, 39, 32, .96), rgba(17, 19, 26, .98));
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  padding: clamp(1.2rem, 3.5vw, 2.4rem);
+  max-height: 100%;
+}
+.menu-head { border-bottom: 1px solid #332f26; padding-bottom: 1rem; }
+.menu-body {
+  display: grid; gap: 1.1rem;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  overflow: auto;
+}
+.group h3 { margin-bottom: .45rem; }
+
+.choice { display: flex; gap: .5rem; flex-wrap: wrap; }
+.choice.column { flex-direction: column; }
+.choice button {
+  flex: 1 1 auto; min-width: 72px; min-height: 58px;
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: center;
+  gap: .1rem; padding: .5rem .8rem;
+  background: rgba(16, 18, 25, .85);
+  border: 1px solid #3d4354; color: var(--parch);
+  font: inherit; text-align: left; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.choice button b { font-size: 1.05rem; }
+.choice button span { font-size: .8rem; color: var(--muted); }
+.choice button:hover { border-color: var(--brass); }
+.choice button.on {
+  background: linear-gradient(180deg, rgba(120, 92, 34, .55), rgba(60, 46, 18, .5));
+  border-color: var(--brass);
+  box-shadow: inset 0 0 0 1px rgba(240, 213, 144, .25);
+}
+.choice.swatches button {
+  min-width: 0; flex: 1 1 0; align-items: center; min-height: 62px;
+}
+.swatch {
+  width: 26px; height: 26px; border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .18), 0 0 14px currentColor;
+}
+.menu-foot { display: flex; gap: .7rem; flex-wrap: wrap; align-items: center; }
+
+.howto { margin: 0 0 1.2rem; padding-left: 1.1rem; color: #c4bcaa; }
+.howto li { margin-bottom: .7rem; }
+.howto b { color: var(--parch); }
+
+/* -------------------------------- Buttons -------------------------------- */
+button { font: inherit; border-radius: 2px; border: 1px solid transparent; cursor: pointer; }
+button:active { transform: translateY(1px); }
+button:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+button:disabled { opacity: .4; cursor: not-allowed; }
+
+.primary {
+  background: linear-gradient(180deg, #e9c065, #b98c2e);
+  color: #241c08; font-weight: 700; border-color: var(--brass-lt);
+  padding: .7rem 1.3rem;
+}
+.primary.big { padding: .95rem 2rem; font-size: 1.1rem; letter-spacing: .01em; }
+.ghost {
+  background: rgba(28, 32, 43, .85); color: var(--parch);
+  border-color: #4a5163; padding: .7rem 1.2rem;
+}
+.ghost:hover { border-color: var(--brass); }
+.wide { width: 100%; margin-top: .9rem; }
+
+/* ---------------------------------- HUD ---------------------------------- */
+#hud { position: fixed; inset: 0; z-index: 20; pointer-events: none; }
+#hud button { pointer-events: auto; }
+
+#hud-top {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+  padding: max(.6rem, env(safe-area-inset-top)) .8rem .6rem;
+  background: linear-gradient(180deg, rgba(6, 7, 11, .85), transparent);
+}
+.spacer { flex: 1 1 auto; }
+.chip {
+  display: flex; align-items: center; gap: .45rem;
+  background: rgba(12, 14, 20, .82);
+  border: 1px solid var(--line);
+  padding: .34rem .7rem; min-height: 40px;
+  border-radius: 2px;
+}
+.chip.tap { color: var(--parch); font-size: 1.1rem; padding: .2rem .6rem; }
+.dot { width: 15px; height: 15px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255, 255, 255, .22), 0 0 12px currentColor; }
+.goal #goal-emoji { font-size: 1.7rem; line-height: 1; }
+.goal-text { display: flex; flex-direction: column; line-height: 1.1; }
+.goal-text small { font-size: .68rem; color: var(--muted); }
+.goal-text b { font-size: 1.05rem; }
+.goal.secret { opacity: .7; }
+.pips { display: flex; gap: 4px; margin-left: .3rem; }
+.pips i { width: 8px; height: 8px; border-radius: 50%; background: #4a5163; display: block; }
+.pips i.on { background: var(--brass); box-shadow: 0 0 8px var(--brass); }
+#timer { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 54px; justify-content: center; }
+#timer::before { content: '⏱'; margin-right: .25rem; font-weight: 400; }
+#timer.urgent { color: var(--ember); border-color: var(--ember); }
+
+#phase-banner {
+  position: absolute; left: 50%; top: 19%; transform: translateX(-50%);
+  text-align: center; max-width: 92vw;
+  background: rgba(9, 10, 15, .78);
+  border: 1px solid var(--line); border-left: 3px solid var(--brass);
+  padding: .7rem 1.3rem;
+}
+#phase-banner strong { display: block; font-family: 'Cinzel', serif; font-size: 1.15rem; }
+#phase-banner span { color: #bdb5a2; font-size: .9rem; }
+
+#loose-label {
+  position: absolute; z-index: 22;
+  transform: translate(-50%, -100%);
+  background: rgba(9, 10, 15, .9);
+  border: 1px solid var(--brass); color: var(--brass-lt);
+  padding: .25rem .6rem; font-size: .82rem; white-space: nowrap;
+  pointer-events: none;
+}
+#loose-label::after {
+  content: ''; position: absolute; left: 50%; bottom: -7px;
+  border: 6px solid transparent; border-top-color: var(--brass); margin-left: -6px;
+}
+
+.toast {
+  position: absolute; left: 50%; bottom: 32%; transform: translate(-50%, 12px);
+  background: rgba(10, 12, 18, .95); border: 1px solid #4a5163;
+  padding: .7rem 1.2rem; max-width: 88vw; text-align: center;
+  opacity: 0; transition: opacity .22s, transform .22s;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.good { border-color: var(--moss); }
+.toast.warn { border-color: var(--ember); }
+
+#minimap-wrap {
+  position: absolute; top: 5rem; right: .8rem;
+  border: 1px solid var(--line); background: rgba(8, 9, 14, .92); padding: 4px;
+}
+#minimap { display: block; width: 170px; height: 170px; }
+
+#hud-bottom {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: .7rem .8rem max(.8rem, env(safe-area-inset-bottom));
+  background: linear-gradient(0deg, rgba(6, 7, 11, .88), transparent);
+}
+#hint-controls { margin: 0 0 .5rem; font-size: .85rem; color: var(--muted); }
+#hud-bottom .bar { display: flex; gap: .5rem; flex-wrap: wrap; }
+.action {
+  display: flex; align-items: center; gap: .45rem;
+  min-height: 52px; padding: .5rem 1rem;
+  background: rgba(20, 23, 32, .9); border: 1px solid #4a5163; color: var(--parch);
+  font-size: 1.15rem;
+}
+.action span { font-size: .95rem; }
+.action:hover { border-color: var(--brass); }
+.action.good { background: linear-gradient(180deg, #e9c065, #b98c2e); color: #241c08; border-color: var(--brass-lt); font-weight: 700; }
+
+/* ------------------------- Touch-Ebene + Joystick ------------------------- */
+#touch-layer { position: fixed; inset: 0; z-index: 15; touch-action: none; }
+.pad {
+  position: fixed; z-index: 16; width: 150px; height: 150px; margin: -75px 0 0 -75px;
+  border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(60, 66, 84, .36), rgba(14, 16, 24, .48));
+  border: 1px solid rgba(215, 169, 75, .45);
+}
+.pad.turn { border-color: rgba(111, 191, 138, .5); }
+.knob {
+  position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #e9c065, #8a6d2c);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .55);
+}
+.pad.turn .knob { background: radial-gradient(circle at 35% 30%, #8fe0ac, #3d7d57); }
+
+/* ---------------------------------- Laden -------------------------------- */
+#shop-list { display: grid; gap: .55rem; margin: 1rem 0; }
+.shop-item {
+  display: flex; align-items: center; gap: .9rem; text-align: left;
+  background: rgba(18, 20, 28, .9); border: 1px solid #4a5163;
+  color: var(--parch); padding: .8rem .9rem; min-height: 64px;
+}
+.shop-item:hover:not(:disabled) { border-color: var(--brass); }
+.shop-icon { font-size: 1.7rem; }
+.shop-body { display: flex; flex-direction: column; }
+.shop-body span { font-size: .84rem; color: var(--muted); }
+.shop-price { margin-left: auto; color: var(--brass); font-weight: 700; white-space: nowrap; }
+
+/* -------------------------- Geräteabhängiges ----------------------------- */
+body.touch .only-desk { display: none; }
+body:not(.touch) .only-touch { display: none; }
+
+@media (max-width: 700px) {
+  #hud-top { gap: .4rem; }
+  .goal { order: 5; }
+  #hint-controls { display: none; }
+  .action span { display: none; }
+  .action { flex: 1 1 0; justify-content: center; font-size: 1.4rem; min-height: 58px; }
+  #minimap { width: 132px; height: 132px; }
+  .menu-body { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ----------------------------- Menü-Reiter ------------------------------- */
+.tabs { display: flex; gap: .4rem; margin-top: .8rem; }
+.tab {
+  background: transparent; color: var(--muted); border: 1px solid transparent;
+  border-bottom: 2px solid transparent; padding: .5rem 1rem; font-size: 1rem;
+}
+.tab.on { color: var(--brass-lt); border-bottom-color: var(--brass); }
+.tab:hover { color: var(--parch); }
+
+.pane { display: grid; gap: 1.1rem; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+.free { margin-top: .6rem; display: flex; flex-direction: column; gap: .3rem; }
+.free label { font-size: .82rem; color: var(--muted); }
+.free input {
+  background: #12141c; color: var(--parch); border: 1px solid var(--line);
+  padding: .6rem .7rem; font: inherit; width: 140px;
+}
+.keylist { margin: 0; padding-left: 1.1rem; color: var(--muted); font-size: .92rem; }
+.keylist b { color: var(--brass); }
+.cfg-info { margin: 0; font-size: .85rem; color: var(--muted); flex: 1 1 220px; }
+.menu-foot { display: flex; gap: .8rem; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.foot-buttons { display: flex; gap: .6rem; flex-wrap: wrap; }
+
+/* ---------------------------- Schieberegler ------------------------------ */
+.slider { margin-bottom: .9rem; }
+.slider label { display: block; font-size: .9rem; color: var(--muted); margin-bottom: .3rem; }
+.slider label b { color: var(--brass-lt); font-variant-numeric: tabular-nums; }
+.slider input[type=range] {
+  width: 100%; appearance: none; height: 26px; background: transparent; cursor: pointer;
+}
+.slider input[type=range]::-webkit-slider-runnable-track {
+  height: 5px; background: #3a3f4f; border: 1px solid var(--line);
+}
+.slider input[type=range]::-webkit-slider-thumb {
+  appearance: none; width: 26px; height: 26px; margin-top: -11px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #e9c065, #8a6d2c);
+  border: 1px solid var(--brass-lt);
+}
+.slider input[type=range]::-moz-range-track { height: 5px; background: #3a3f4f; }
+.slider input[type=range]::-moz-range-thumb {
+  width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--brass-lt);
+  background: radial-gradient(circle at 35% 30%, #e9c065, #8a6d2c);
+}
+.slider .ends { display: flex; justify-content: space-between; font-size: .76rem; color: #7d7767; }
+.slider .ends i { font-style: normal; }
+
+.action.aktiv { border-color: var(--brass); box-shadow: inset 0 0 0 1px rgba(240, 213, 144, .35); color: var(--brass-lt); }
+
+</style>
+</head>
+<body>
+
+<div id="canvas-wrap"></div>
+
+<!-- Nimmt Fingereingaben nur während der Laufphase entgegen -->
+<div id="touch-layer" class="hidden"></div>
+<div id="joystick" class="pad hidden"><div id="stick" class="knob"></div></div>
+<div id="joystick2" class="pad turn hidden"><div id="stick2" class="knob"></div></div>
+
+<!-- ============================== Startmenü ============================== -->
+<div id="start-screen" class="overlay">
+  <div class="menu">
+
+    <div class="menu-head">
+      <p class="kicker">Ein Labyrinth, das sich bewegt</p>
+      <h1>Die Wandernden Gänge</h1>
+      <div class="tabs">
+        <button class="tab on" data-tab="partie">Partie</button>
+        <button class="tab" data-tab="steuerung">Steuerung</button>
+      </div>
+    </div>
+
+    <div class="menu-body">
+      <div class="pane" data-pane="partie">
+        <section class="group" data-key="size">
+          <h3>Feldgröße</h3>
+          <div class="choice">
+            <button data-value="7" class="on"><b>7 × 7</b><span>klassisch</span></button>
+            <button data-value="9"><b>9 × 9</b><span>weitläufig</span></button>
+            <button data-value="11"><b>11 × 11</b><span>riesig</span></button>
+            <button data-value="frei"><b>frei</b><span>selbst wählen</span></button>
+          </div>
+          <div id="free-size-wrap" class="free hidden">
+            <label for="free-size">Kantenlänge (5–15, ungerade)</label>
+            <input id="free-size" type="number" min="5" max="15" step="2" value="13">
+          </div>
+        </section>
+
+        <section class="group" data-key="style">
+          <h3>Gänge</h3>
+          <div class="choice column">
+            <button data-value="verschlungen" class="on"><b>Verschlungen</b><span>viele Sackgassen, man kommt längst nicht überall hin</span></button>
+            <button data-value="normal"><b>Normal</b><span>ausgewogenes Wegenetz</span></button>
+            <button data-value="offen"><b>Offen</b><span>weite Hallen, gut zum Kennenlernen</span></button>
+          </div>
+        </section>
+
+        <section class="group" data-key="humans">
+          <h3>Menschen am Gerät</h3>
+          <div class="choice">
+            <button data-value="1" class="on"><b>1</b><span>gegen Bots</span></button>
+            <button data-value="2"><b>2</b><span>abwechselnd</span></button>
+          </div>
+        </section>
+
+        <section class="group" data-key="bots">
+          <h3>Bots</h3>
+          <div class="choice">
+            <button data-value="1"><b>1</b><span>ruhig</span></button>
+            <button data-value="2" class="on"><b>2</b><span>lebhaft</span></button>
+            <button data-value="3"><b>3</b><span>volles Feld</span></button>
+          </div>
+        </section>
+
+        <section class="group" data-key="difficulty">
+          <h3>Können der Bots</h3>
+          <div class="choice column">
+            <button data-value="anfaenger"><b>Anfänger</b><span>schiebt planlos, vergisst ständig sein Ziel</span></button>
+            <button data-value="einfach"><b>Einfach</b><span>verläuft sich oft</span></button>
+            <button data-value="mittel" class="on"><b>Mittel</b><span>solide Züge, gelegentliche Fehler</span></button>
+            <button data-value="schwer"><b>Schwer</b><span>rechnet den kürzesten Weg</span></button>
+          </div>
+        </section>
+
+        <section class="group" data-key="goals">
+          <h3>Zeichen pro Spieler</h3>
+          <div class="choice">
+            <button data-value="3"><b>3</b><span>kurz</span></button>
+            <button data-value="5" class="on"><b>5</b><span>normal</span></button>
+            <button data-value="8"><b>8</b><span>lang</span></button>
+            <button data-value="12"><b>12</b><span>Marathon</span></button>
+          </div>
+        </section>
+
+        <section class="group" data-key="color">
+          <h3>Deine Farbe</h3>
+          <div class="choice swatches" id="color-choice"></div>
+        </section>
+      </div>
+
+      <div class="pane hidden" data-pane="steuerung">
+        <section class="group" data-key="controls">
+          <h3>So wird gelaufen</h3>
+          <div class="choice column">
+            <button data-value="dual"><b>Zwei Joysticks (Touch)</b><span>links laufen, rechts drehen – beide erscheinen unter dem Finger</span></button>
+            <button data-value="tank"><b>Ein Joystick (Touch)</b><span>vor/zurück läuft, links/rechts dreht</span></button>
+            <button data-value="wasd"><b>W A S D oder Pfeiltasten + Maus</b><span>beide Tastensätze laufen, die Maus dreht</span></button>
+            <button data-value="wasdArrows"><b>W A S D laufen, Pfeiltasten drehen</b><span>ganz ohne Maus, ←/→ dreht, ↑/↓ neigt</span></button>
+            <button data-value="wsad"><b>W/S laufen, A/D drehen</b><span>wie ein Panzer</span></button>
+          </div>
+        </section>
+        <section class="group">
+          <h3>Geschwindigkeit</h3>
+          <div class="slider">
+            <label for="speed-walk">Laufen <b id="speed-walk-val">7,2</b></label>
+            <input id="speed-walk" type="range" min="3" max="16" step="0.2" value="7.2">
+            <span class="ends"><i>gemächlich</i><i>flott</i></span>
+          </div>
+          <div class="slider">
+            <label for="speed-turn">Drehen <b id="speed-turn-val">100 %</b></label>
+            <input id="speed-turn" type="range" min="0.3" max="2.5" step="0.05" value="1">
+            <span class="ends"><i>ruhig</i><i>schnell</i></span>
+          </div>
+        </section>
+
+        <section class="group">
+          <h3>Immer gleich</h3>
+          <ul class="keylist">
+            <li><b>R</b> dreht die Schiebekarte</li>
+            <li><b>Enter</b> schiebt die Karte ein</li>
+            <li><b>E</b> bestätigt die Position</li>
+            <li><b>Leertaste</b> beendet den Zug</li>
+            <li><b>Mausrad / zwei Finger</b> zoomt in der Vogelperspektive</li>
+            <li><b>🔆 im Spielbalken</b> schaltet die Leuchtsäulen um</li>
+          </ul>
+          <p class="lede" style="margin-top:.8rem">Alle Einstellungen werden im
+            Browser gemerkt und sind beim nächsten Start wieder da.</p>
+        </section>
+      </div>
+    </div>
+
+    <div class="menu-foot">
+      <p id="cfg-info" class="cfg-info"></p>
+      <div class="foot-buttons">
+        <button id="btn-help" class="ghost">So wird gespielt</button>
+        <button id="btn-play" class="primary big">Partie beginnen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== Anleitung ============================== -->
+<div id="help-screen" class="overlay hidden">
+  <div class="panel">
+    <h2>So wird gespielt</h2>
+    <ol class="howto">
+      <li><b>Schieben.</b> Von oben siehst du das Feld; außen liegt deine lose
+        Karte. Zieh sie auf eines der leuchtenden Felder am Rand, dreh sie dort
+        noch zurecht und tippe dann den grünen Pfeil an. Die ganze Reihe rutscht
+        weiter, gegenüber fällt eine Karte heraus. Das Feld, aus dem zuletzt
+        geschoben wurde, ist rot und gesperrt. Fährst du mit dem Zeiger über
+        das Labyrinth, bekommt die Karte darunter einen roten Rahmen – so
+        siehst du genau, welche Wände zu welcher Karte gehören.</li>
+      <li><b>Laufen.</b> Danach siehst du das Labyrinth aus den Augen deiner
+        Figur – die Mauern sind höher als du, drüberschauen gilt nicht.</li>
+      <li><b>Finden.</b> Lauf zu dem Zeichen, das oben im Balken steht. Stehst du
+        davor, zählt es sofort; im Zweifel „Hier ist es“ drücken.</li>
+      <li><b>Leuchtsäulen.</b> In der Übersicht steht über deinem gesuchten
+        Zeichen und über jeder Figur eine senkrechte Lichtsäule – so siehst du
+        beim Schieben sofort, wo alle stecken und wohin es gehen muss. Sobald
+        du selbst losläufst, erlöschen sie: Suchen sollst du schon selbst. Mit
+        🔆 im Balken ganz abschaltbar.</li>
+      <li><b>Münzen.</b> Jeder Fund bringt Münzen, schnelle Funde mehr. Im Laden
+        gibt es Hinweise: beste Schiebestelle, leuchtender Weg, Übersichtskarte,
+        Richtungspfeil.</li>
+    </ol>
+    <button id="btn-help-close" class="primary wide">Verstanden</button>
+  </div>
+</div>
+
+<!-- ================================= HUD ================================= -->
+<div id="hud" class="hidden">
+
+  <div id="hud-top">
+    <div class="chip who">
+      <span id="p-color" class="dot"></span>
+      <span id="p-name">Du</span>
+    </div>
+
+    <div id="goal-card" class="chip goal">
+      <span id="goal-emoji">👻</span>
+      <span class="goal-text">
+        <small>dein Zeichen</small>
+        <b id="goal-name">Geist</b>
+      </span>
+      <span id="goal-progress" class="pips"></span>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div id="timer" class="chip hidden">45</div>
+    <div class="chip coins">🪙 <b id="coins">120</b></div>
+    <button id="btn-sound" class="chip tap" title="Ton an/aus">🔊</button>
+  </div>
+
+  <div id="phase-banner" class="hidden"></div>
+  <div id="loose-label" class="hidden">Deine Karte</div>
+  <div id="toast" class="toast"></div>
+
+  <div id="minimap-wrap" class="hidden">
+    <canvas id="minimap" width="300" height="300"></canvas>
+  </div>
+
+  <div id="hud-bottom">
+    <p id="hint-controls"></p>
+    <div class="bar">
+      <button id="btn-rotate" class="action">⟳<span>Drehen</span></button>
+      <button id="btn-push" class="action good hidden">➜<span>Einschieben</span></button>
+      <button id="btn-confirm" class="action good">✓<span>Hier ist es</span></button>
+      <button id="btn-endturn" class="action">⏭<span>Zug beenden</span></button>
+      <button id="btn-beacon" class="action aktiv" title="Leuchtsäulen aus">🔆<span>Säulen</span></button>
+      <button id="btn-shop" class="action">🛒<span>Laden</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ================================ Laden ================================ -->
+<div id="shop-modal" class="overlay hidden">
+  <div class="panel">
+    <h2>Der Laden im Torhaus</h2>
+    <p class="lede">Im Beutel: 🪙 <b id="shop-coins">120</b>. Was gerade nicht zur
+      Phase passt, ist ausgegraut.</p>
+    <div id="shop-list"></div>
+    <button id="btn-shop-close" class="ghost wide">Zurück ins Labyrinth</button>
+  </div>
+</div>
+
+<!-- =========================== Spielerwechsel ============================ -->
+<div id="pass-screen" class="overlay hidden">
+  <div class="panel center">
+    <h2>Gerät weitergeben</h2>
+    <p class="lede">Am Zug ist <b id="pass-name">Spieler 2</b>. Das Zeichen
+      erscheint erst nach dem Antippen.</p>
+    <button id="btn-pass-ok" class="primary big">Ich bin es</button>
+  </div>
+</div>
+
+<!-- ================================= Sieg ================================ -->
+<div id="win-screen" class="overlay hidden">
+  <div class="panel center">
+    <h2>Alle Zeichen gefunden</h2>
+    <p class="lede" id="win-text"></p>
+    <button id="btn-restart" class="primary big">Neue Partie</button>
+  </div>
+</div>
+
+<!-- ============================ Fehleranzeige ============================ -->
+<div id="error-screen" class="overlay hidden">
+  <div class="panel">
+    <h2>Da ist etwas schiefgegangen</h2>
+    <p class="lede">Damit lässt sich der Fehler finden:</p>
+    <pre id="error-text"></pre>
+    <button class="ghost wide" onclick="location.reload()">Neu laden</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// Ausweichquellen, falls das erste CDN nicht erreichbar ist
+(function () {
+  var quellen = [
+    'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js',
+    'https://unpkg.com/three@0.128.0/build/three.min.js'
+  ];
+  function laden(i) {
+    if (window.THREE || i >= quellen.length) return;
+    var s = document.createElement('script');
+    s.src = quellen[i];
+    s.onerror = function () { laden(i + 1); };
+    s.onload = function () { if (window.LAB && window.LAB.Game) window.LAB.Game.boot(); };
+    document.head.appendChild(s);
+  }
+  if (!window.THREE) laden(0);
+})();
+</script>
+<script>
+/* ==== js/maze.js ==== */
+/* =========================================================================
+   maze.js  –  Datenmodell des Labyrinths (kennt kein Three.js)
+   -------------------------------------------------------------------------
+   Neu in dieser Fassung:
+     - beliebige ungerade Feldgrößen (5 bis 15)
+     - drei Gangdichten: verschlungen / normal / offen
+     - 40 Symbole, Anzahl wächst mit dem Feld
+   ========================================================================= */
+window.LAB = window.LAB || {};
+(function (LAB) {
+  'use strict';
+
+  const N = 0, E = 1, S = 2, W = 3;
+  const DELTA = [
+    { dr: -1, dc: 0 }, { dr: 0, dc: 1 }, { dr: 1, dc: 0 }, { dr: 0, dc: -1 }
+  ];
+
+  const BASE_OPEN = {
+    L: [N, E],        // Ecke
+    I: [N, S],        // Gerade
+    T: [N, E, S],     // T-Kreuzung (Wand im Westen)
+    X: [N, E, S, W]   // offene Kreuzung
+  };
+
+  const ITEMS = [
+    { key: 'geist', emoji: '👻', name: 'Geist', color: 0xbfe6ff },
+    { key: 'schatz', emoji: '💰', name: 'Schatz', color: 0xffd166 },
+    { key: 'schluessel', emoji: '🗝️', name: 'Schlüssel', color: 0xe0c068 },
+    { key: 'krone', emoji: '👑', name: 'Krone', color: 0xffdd55 },
+    { key: 'drache', emoji: '🐉', name: 'Drache', color: 0x6fcf7f },
+    { key: 'zauberbuch', emoji: '📕', name: 'Zauberbuch', color: 0xd05a5a },
+    { key: 'burg', emoji: '🏰', name: 'Burg', color: 0xc9c2b4 },
+    { key: 'edelstein', emoji: '💎', name: 'Edelstein', color: 0x6fe3ff },
+    { key: 'eule', emoji: '🦉', name: 'Eule', color: 0xc79a6b },
+    { key: 'kerze', emoji: '🕯️', name: 'Kerze', color: 0xffe0a0 },
+    { key: 'schwert', emoji: '⚔️', name: 'Schwert', color: 0xdadfe6 },
+    { key: 'schild', emoji: '🛡️', name: 'Schild', color: 0x9aa7c7 },
+    { key: 'trank', emoji: '🧪', name: 'Zaubertrank', color: 0x9be36f },
+    { key: 'ring', emoji: '💍', name: 'Ring', color: 0xffe9a8 },
+    { key: 'stab', emoji: '🪄', name: 'Zauberstab', color: 0xe8d9ff },
+    { key: 'fledermaus', emoji: '🦇', name: 'Fledermaus', color: 0x8d7bb0 },
+    { key: 'spinne', emoji: '🕷️', name: 'Spinne', color: 0x8a7a6a },
+    { key: 'pilz', emoji: '🍄', name: 'Zauberpilz', color: 0xe06a6a },
+    { key: 'amphore', emoji: '⚱️', name: 'Amphore', color: 0xc0a080 },
+    { key: 'kugel', emoji: '🔮', name: 'Kristallkugel', color: 0xb08fe0 },
+    { key: 'statue', emoji: '🗿', name: 'Steinstatue', color: 0xa8a29a },
+    { key: 'muenze', emoji: '🪙', name: 'Goldmünze', color: 0xffcc4d },
+    { key: 'kuerbis', emoji: '🎃', name: 'Kürbisgeist', color: 0xff9d3d },
+    { key: 'ratte', emoji: '🐀', name: 'Ratte', color: 0xa0a0a0 },
+    { key: 'taube', emoji: '🕊️', name: 'Taube', color: 0xf0f4ff },
+    { key: 'schlange', emoji: '🐍', name: 'Schlange', color: 0x7fc96f },
+    { key: 'skorpion', emoji: '🦂', name: 'Skorpion', color: 0xc98b4b },
+    { key: 'dolch', emoji: '🗡️', name: 'Dolch', color: 0xc8d0dc },
+    { key: 'vase', emoji: '🏺', name: 'Tonvase', color: 0xd09a62 },
+    { key: 'kompass', emoji: '🧭', name: 'Kompass', color: 0xa8c6e0 },
+    { key: 'sanduhr', emoji: '⏳', name: 'Sanduhr', color: 0xf0d8a0 },
+    { key: 'glocke', emoji: '🔔', name: 'Glocke', color: 0xe6c25a },
+    { key: 'axt', emoji: '🪓', name: 'Axt', color: 0xb08050 },
+    { key: 'kelch', emoji: '🍷', name: 'Kelch', color: 0xd06a8a },
+    { key: 'talisman', emoji: '🧿', name: 'Talisman', color: 0x5aa8e0 },
+    { key: 'falke', emoji: '🦅', name: 'Falke', color: 0xb89060 },
+    { key: 'wolf', emoji: '🐺', name: 'Wolf', color: 0x9aa0aa },
+    { key: 'netz', emoji: '🕸️', name: 'Spinnennetz', color: 0xd8dce4 },
+    { key: 'kolben', emoji: '⚗️', name: 'Kolben', color: 0x8fd6c0 },
+    { key: 'feder', emoji: '🪶', name: 'Feder', color: 0xe8e0d0 },
+    { key: 'laterne', emoji: '🏮', name: 'Laterne', color: 0xe06a4a },
+    { key: 'karte', emoji: '🗺️', name: 'Schatzkarte', color: 0xd8c69a },
+    { key: 'truhe', emoji: '🧰', name: 'Truhe', color: 0xa07850 },
+    { key: 'anker', emoji: '⚓', name: 'Anker', color: 0x8fa4b8 },
+    { key: 'harfe', emoji: '🪕', name: 'Harfe', color: 0xc89a5a },
+    { key: 'maske', emoji: '🎭', name: 'Maske', color: 0xd4a0c0 },
+    { key: 'wuerfel', emoji: '🎲', name: 'Würfel', color: 0xf0f0f0 },
+    { key: 'schaedel', emoji: '💀', name: 'Schädel', color: 0xe4e4e0 },
+    { key: 'rose', emoji: '🌹', name: 'Rose', color: 0xd85a6a },
+    { key: 'blatt', emoji: '🍁', name: 'Herbstblatt', color: 0xd87a3a },
+    { key: 'mond', emoji: '🌙', name: 'Mondsichel', color: 0xf0e0a0 },
+    { key: 'stern', emoji: '⭐', name: 'Stern', color: 0xffd84d },
+    { key: 'flamme', emoji: '🔥', name: 'Ewige Flamme', color: 0xff8a3d },
+    { key: 'tropfen', emoji: '💧', name: 'Quelltropfen', color: 0x6fc0e8 },
+    { key: 'blitz', emoji: '⚡', name: 'Blitz', color: 0xffe04d },
+    { key: 'eisen', emoji: '⛓️', name: 'Kette', color: 0x9aa0a8 },
+    { key: 'brief', emoji: '📜', name: 'Schriftrolle', color: 0xe0d0a8 },
+    { key: 'ei', emoji: '🥚', name: 'Drachenei', color: 0xf0e8d8 },
+    { key: 'krug', emoji: '🫙', name: 'Krug', color: 0xc8d8d0 },
+    { key: 'kristall', emoji: '🪨', name: 'Runenstein', color: 0x9a9088 }
+  ];
+
+  // Anteile der Kartentypen. Viele Ecken und Geraden ergeben ein verwinkeltes
+  // Labyrinth, in dem man eben nicht überall hinkommt. "ziel" ist der Anteil
+  // des Feldes, der von den Startecken aus mindestens erreichbar sein soll.
+  // lo/hi = Anteil des Feldes, der von jeder Startecke aus begehbar sein soll.
+  // Die Drehungen werden in dieses Band hineingeschoben – nach oben wie nach
+  // unten. Ohne Obergrenze wird auch ein Ecken-lastiges Labyrinth glattgebügelt.
+  const STYLES = {
+    verschlungen: { L: 0.46, I: 0.34, T: 0.18, X: 0.02, lo: 0.10, hi: 0.30 },
+    normal: { L: 0.30, I: 0.26, T: 0.30, X: 0.14, lo: 0.45, hi: 0.80 },
+    offen: { L: 0.16, I: 0.20, T: 0.36, X: 0.28, lo: 0.88, hi: 1.0 }
+  };
+
+  let nextTileId = 1;
+
+  class Tile {
+    constructor(type, rot, fixed) {
+      this.id = nextTileId++;
+      this.type = type;
+      this.rot = ((rot % 4) + 4) % 4;
+      this.fixed = !!fixed;
+      this.item = null;
+    }
+    open(d) {
+      const base = BASE_OPEN[this.type];
+      for (let i = 0; i < base.length; i++) if (((base[i] + this.rot) & 3) === d) return true;
+      return false;
+    }
+    openDirs() {
+      const rot = this.rot;
+      return BASE_OPEN[this.type].map(function (b) { return (b + rot) & 3; });
+    }
+    rotate(steps) { this.rot = (this.rot + (steps || 1)) & 3; }
+    clone() {
+      const t = new Tile(this.type, this.rot, this.fixed);
+      t.id = this.id; t.item = this.item;
+      return t;
+    }
+  }
+
+  /* -------- Funktionen, die auf einem beliebigen Grid arbeiten ------------ */
+
+  function inside(size, r, c) { return r >= 0 && c >= 0 && r < size && c < size; }
+
+  function openEdge(grid, size, r, c, d) {
+    const t = grid[r][c];
+    if (!t.open(d)) return false;
+    const nr = r + DELTA[d].dr, nc = c + DELTA[d].dc;
+    if (!inside(size, nr, nc)) return false;
+    return grid[nr][nc].open((d + 2) & 3);
+  }
+
+  function bfs(grid, size, sr, sc) {
+    const dist = [], prev = [];
+    for (let r = 0; r < size; r++) {
+      dist.push(new Array(size).fill(-1));
+      prev.push(new Array(size).fill(null));
+    }
+    if (!inside(size, sr, sc)) return { dist: dist, prev: prev };
+    dist[sr][sc] = 0;
+    const q = [[sr, sc]];
+    let head = 0;
+    while (head < q.length) {
+      const cur = q[head++], r = cur[0], c = cur[1];
+      for (let d = 0; d < 4; d++) {
+        if (!openEdge(grid, size, r, c, d)) continue;
+        const nr = r + DELTA[d].dr, nc = c + DELTA[d].dc;
+        if (dist[nr][nc] !== -1) continue;
+        dist[nr][nc] = dist[r][c] + 1;
+        prev[nr][nc] = { r: r, c: c };
+        q.push([nr, nc]);
+      }
+    }
+    return { dist: dist, prev: prev };
+  }
+
+  function pathTo(prev, tr, tc, sr, sc) {
+    const path = [];
+    let r = tr, c = tc, guard = 0;
+    while (guard++ < 4000) {
+      path.push({ r: r, c: c });
+      if (r === sr && c === sc) { path.reverse(); return path; }
+      const p = prev[r][c];
+      if (!p) return null;
+      r = p.r; c = p.c;
+    }
+    return null;
+  }
+
+  function findItem(grid, size, key) {
+    for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) {
+      if (grid[r][c].item === key) return { r: r, c: c };
+    }
+    return null;
+  }
+
+  function simulate(grid, size, looseTile, pt) {
+    const g = grid.map(function (row) { return row.slice(); });
+    let ejected;
+    const i = pt.index;
+    if (pt.side === 'left') {
+      ejected = g[i][size - 1];
+      for (let c = size - 1; c >= 1; c--) g[i][c] = g[i][c - 1];
+      g[i][0] = looseTile;
+    } else if (pt.side === 'right') {
+      ejected = g[i][0];
+      for (let c = 0; c <= size - 2; c++) g[i][c] = g[i][c + 1];
+      g[i][size - 1] = looseTile;
+    } else if (pt.side === 'top') {
+      ejected = g[size - 1][i];
+      for (let r = size - 1; r >= 1; r--) g[r][i] = g[r - 1][i];
+      g[0][i] = looseTile;
+    } else {
+      ejected = g[0][i];
+      for (let r = 0; r <= size - 2; r++) g[r][i] = g[r + 1][i];
+      g[size - 1][i] = looseTile;
+    }
+    return { grid: g, ejected: ejected };
+  }
+
+  function shiftPosition(size, pt, pos) {
+    const r = pos.r, c = pos.c, i = pt.index;
+    if (pt.side === 'left' && r === i) return { r: r, c: c === size - 1 ? 0 : c + 1 };
+    if (pt.side === 'right' && r === i) return { r: r, c: c === 0 ? size - 1 : c - 1 };
+    if (pt.side === 'top' && c === i) return { r: r === size - 1 ? 0 : r + 1, c: c };
+    if (pt.side === 'bottom' && c === i) return { r: r === 0 ? size - 1 : r - 1, c: c };
+    return { r: r, c: c };
+  }
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+
+  /** Vier Startecken für eine beliebige Feldgröße */
+  function startCells(size) {
+    const l = size - 1;
+    return [{ r: 0, c: 0 }, { r: 0, c: l }, { r: l, c: l }, { r: l, c: 0 }];
+  }
+
+  /* ------------------------------ Maze ----------------------------------- */
+
+  class Maze {
+    constructor(size, style) {
+      this.size = Math.max(5, Math.min(15, (size || 7) | 1)); // immer ungerade
+      this.style = STYLES[style] ? style : 'normal';
+      this.grid = [];
+      this.loose = null;
+      this.blocked = null;
+      this.generate();
+    }
+
+    generate() {
+      const s = this.size, last = s - 1, mid = (s - 1) / 2;
+
+      // 1) Feste Karten auf allen Feldern mit geraden Zeilen-/Spaltennummern
+      this.grid = [];
+      for (let r = 0; r < s; r++) this.grid.push(new Array(s).fill(null));
+
+      const fixedTiles = [];
+      for (let r = 0; r < s; r += 2) {
+        for (let c = 0; c < s; c += 2) {
+          let type = 'T', rot = 0;
+          if (r === 0 && c === 0) { type = 'L'; rot = 1; }
+          else if (r === 0 && c === last) { type = 'L'; rot = 2; }
+          else if (r === last && c === last) { type = 'L'; rot = 3; }
+          else if (r === last && c === 0) { type = 'L'; rot = 0; }
+          else if (r === 0) rot = 1;
+          else if (r === last) rot = 3;
+          else if (c === 0) rot = 0;
+          else if (c === last) rot = 2;
+          else rot = (c >= mid ? 1 : 0) + (r >= mid ? 2 : 0);
+          const t = new Tile(type, rot, true);
+          this.grid[r][c] = t;
+          fixedTiles.push(t);
+        }
+      }
+
+      // 2) Bewegliche Karten nach gewählter Gangdichte
+      const need = s * s - fixedTiles.length + 1;
+      const mix = STYLES[this.style];
+      const pool = [];
+      ['L', 'I', 'T', 'X'].forEach(function (type) {
+        const n = Math.round(need * mix[type]);
+        for (let i = 0; i < n; i++) pool.push(new Tile(type, Math.floor(Math.random() * 4), false));
+      });
+      while (pool.length < need) pool.push(new Tile('L', Math.floor(Math.random() * 4), false));
+      while (pool.length > need) pool.pop();
+      shuffle(pool);
+
+      let p = 0;
+      const movable = [];
+      for (let r = 0; r < s; r++) for (let c = 0; c < s; c++) {
+        if (!this.grid[r][c]) { this.grid[r][c] = pool[p++]; movable.push(this.grid[r][c]); }
+      }
+      this.loose = pool[p];
+
+      // 3) Symbole verteilen – auf großen Feldern mehr
+      const wanted = Math.min(ITEMS.length, Math.max(12, Math.round(s * s * 0.5)));
+      const items = shuffle(ITEMS.slice()).slice(0, wanted);
+      const fixedT = fixedTiles.filter(function (t) { return t.type === 'T'; });
+      shuffle(fixedT);
+      shuffle(movable);
+      let k = 0;
+      for (let i = 0; i < fixedT.length && k < items.length; i++) fixedT[i].item = items[k++].key;
+      for (let i = 0; i < movable.length && k < items.length; i++) movable[i].item = items[k++].key;
+      this.itemCount = k;
+
+      this.blocked = null;
+      this._improveConnectivity();
+    }
+
+    /**
+     * Rein zufällige Drehungen schneiden regelmäßig ganze Startecken ab.
+     * Deshalb werden Drehungen nachjustiert, bis jede Startecke ein Mindestmaß
+     * an Gängen hat. Das Ziel hängt von der Gangdichte ab – bei
+     * „verschlungen“ bleibt das Labyrinth bewusst zerstückelt.
+     */
+    _improveConnectivity() {
+      const s = this.size, grid = this.grid, cells = s * s;
+      const st = STYLES[this.style];
+      const lo = Math.max(3, Math.round(cells * st.lo));
+      const hi = Math.round(cells * st.hi);
+      const seeds = startCells(s).concat([{ r: (s - 1) / 2, c: (s - 1) / 2 }]);
+
+      // kleinste begehbare Fläche über alle Startpunkte
+      const minReach = function () {
+        let min = Infinity;
+        for (let i = 0; i < seeds.length; i++) {
+          const d = bfs(grid, s, seeds[i].r, seeds[i].c).dist;
+          let n = 0;
+          for (let r = 0; r < s; r++) for (let c = 0; c < s; c++) if (d[r][c] >= 0) n++;
+          if (n < min) min = n;
+        }
+        return min;
+      };
+      const abstand = function (m) { return m < lo ? lo - m : (m > hi ? m - hi : 0); };
+
+      const movable = [];
+      for (let r = 0; r < s; r++) for (let c = 0; c < s; c++) if (!grid[r][c].fixed) movable.push(grid[r][c]);
+
+      let cur = minReach();
+      const runden = Math.min(2000, cells * 25);
+      for (let i = 0; i < runden && abstand(cur) > 0; i++) {
+        const t = movable[Math.floor(Math.random() * movable.length)];
+        const old = t.rot;
+        t.rot = (t.rot + 1 + Math.floor(Math.random() * 3)) & 3;
+        const now = minReach();
+        if (abstand(now) <= abstand(cur)) cur = now; else t.rot = old;
+      }
+      this.startReach = cur;
+    }
+
+    tile(r, c) { return this.grid[r][c]; }
+    inside(r, c) { return inside(this.size, r, c); }
+    openEdge(r, c, d) { return openEdge(this.grid, this.size, r, c, d); }
+    bfs(r, c) { return bfs(this.grid, this.size, r, c); }
+    findItem(key) { return findItem(this.grid, this.size, key); }
+
+    insertionPoints() {
+      const pts = [];
+      for (let i = 1; i < this.size - 1; i += 2) {
+        ['top', 'bottom', 'left', 'right'].forEach(function (side) {
+          pts.push({ side: side, index: i, id: side + i });
+        });
+      }
+      return pts;
+    }
+    isBlocked(pt) { return !!(this.blocked && this.blocked.id === pt.id); }
+    validInsertionPoints() {
+      const self = this;
+      return this.insertionPoints().filter(function (pt) { return !self.isBlocked(pt); });
+    }
+    static opposite(pt) {
+      const map = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' };
+      const side = map[pt.side];
+      return { side: side, index: pt.index, id: side + pt.index };
+    }
+
+    push(pt) {
+      const s = this.size, ins = this.loose, moved = [], i = pt.index;
+      let ejected;
+      const rec = function (tile, fr, fc, tr, tc) {
+        moved.push({ tile: tile, from: { r: fr, c: fc }, to: { r: tr, c: tc } });
+      };
+      if (pt.side === 'left') {
+        ejected = this.grid[i][s - 1]; rec(ejected, i, s - 1, i, s);
+        for (let c = s - 1; c >= 1; c--) { const t = this.grid[i][c - 1]; this.grid[i][c] = t; rec(t, i, c - 1, i, c); }
+        this.grid[i][0] = ins; rec(ins, i, -1, i, 0);
+      } else if (pt.side === 'right') {
+        ejected = this.grid[i][0]; rec(ejected, i, 0, i, -1);
+        for (let c = 0; c <= s - 2; c++) { const t = this.grid[i][c + 1]; this.grid[i][c] = t; rec(t, i, c + 1, i, c); }
+        this.grid[i][s - 1] = ins; rec(ins, i, s, i, s - 1);
+      } else if (pt.side === 'top') {
+        ejected = this.grid[s - 1][i]; rec(ejected, s - 1, i, s, i);
+        for (let r = s - 1; r >= 1; r--) { const t = this.grid[r - 1][i]; this.grid[r][i] = t; rec(t, r - 1, i, r, i); }
+        this.grid[0][i] = ins; rec(ins, -1, i, 0, i);
+      } else {
+        ejected = this.grid[0][i]; rec(ejected, 0, i, -1, i);
+        for (let r = 0; r <= s - 2; r++) { const t = this.grid[r + 1][i]; this.grid[r][i] = t; rec(t, r + 1, i, r, i); }
+        this.grid[s - 1][i] = ins; rec(ins, s, i, s - 1, i);
+      }
+      this.loose = ejected;
+      this.blocked = Maze.opposite(pt);
+      return { inserted: ins, ejected: ejected, moved: moved, point: pt };
+    }
+
+    shiftPosition(pt, pos) { return shiftPosition(this.size, pt, pos); }
+
+    preview(pt, looseRot) {
+      const l = this.loose.clone();
+      l.rot = ((looseRot % 4) + 4) % 4;
+      return simulate(this.grid, this.size, l, pt);
+    }
+  }
+
+  LAB.DIRS = { N: N, E: E, S: S, W: W };
+  LAB.DELTA = DELTA;
+  LAB.ITEMS = ITEMS;
+  LAB.STYLES = STYLES;
+  LAB.itemByKey = function (key) {
+    for (let i = 0; i < ITEMS.length; i++) if (ITEMS[i].key === key) return ITEMS[i];
+    return null;
+  };
+  LAB.Tile = Tile;
+  LAB.Maze = Maze;
+  LAB.mazeUtil = {
+    bfs: bfs, openEdge: openEdge, pathTo: pathTo, findItem: findItem,
+    simulate: simulate, shiftPosition: shiftPosition, shuffle: shuffle,
+    inside: inside, startCells: startCells
+  };
+})(window.LAB);
+
+</script>
+<script>
+/* ==== js/entities.js ==== */
+/* =========================================================================
+   entities.js  –  Spielfiguren und Bot-KI
+   -------------------------------------------------------------------------
+   Vier Stufen: anfaenger (sehr schwach), einfach, mittel, schwer.
+   ========================================================================= */
+window.LAB = window.LAB || {};
+(function (LAB) {
+  'use strict';
+
+  const COLORS = [
+    { name: 'Rot', hex: 0xd94f4f, css: '#e06060' },
+    { name: 'Blau', hex: 0x4f7fd9, css: '#6f9bf0' },
+    { name: 'Grün', hex: 0x54b16a, css: '#6cc985' },
+    { name: 'Gelb', hex: 0xd9c04f, css: '#ecd469' }
+  ];
+
+  const DIFFS = {
+    anfaenger: { label: 'Anfänger', tempo: 0.5, vergisst: 0.55, zufall: 0.95, abbruch: 0.65 },
+    einfach: { label: 'Einfach', tempo: 0.42, vergisst: 0.3, zufall: 0.7, abbruch: 0.45 },
+    mittel: { label: 'Mittel', tempo: 0.34, vergisst: 0.06, zufall: 0.25, abbruch: 0.12 },
+    schwer: { label: 'Schwer', tempo: 0.28, vergisst: 0, zufall: 0.14, abbruch: 0 }
+  };
+
+  class Player {
+    constructor(opts) {
+      this.id = opts.id;
+      this.name = opts.name;
+      this.colorIndex = opts.colorIndex;
+      this.color = COLORS[opts.colorIndex];
+      this.isBot = !!opts.isBot;
+      this.difficulty = DIFFS[opts.difficulty] ? opts.difficulty : 'mittel';
+      this.cell = { r: opts.start.r, c: opts.start.c };
+      this.targets = opts.targets || [];
+      this.targetIndex = 0;
+      this.coins = opts.isBot ? 0 : 120;
+      this.mesh = null;
+      this.walking = false;
+    }
+    get target() { return this.targets[this.targetIndex] || null; }
+    get done() { return this.targetIndex >= this.targets.length; }
+    foundTarget() { this.targetIndex++; }
+  }
+
+  const util = LAB.mazeUtil;
+
+  /** Bewertet alle Einschubstellen mal vier Drehungen (kleiner = besser) */
+  function evaluateMoves(maze, bot, targetKey) {
+    const size = maze.size;
+    const pts = maze.validInsertionPoints();
+    const options = [];
+    for (let rot = 0; rot < 4; rot++) {
+      for (let i = 0; i < pts.length; i++) {
+        const pt = pts[i];
+        const sim = maze.preview(pt, rot);
+        const pos = util.shiftPosition(size, pt, bot.cell);
+        const targetCell = util.findItem(sim.grid, size, targetKey);
+        let score;
+        if (!targetCell) {
+          score = 3 * size;
+        } else {
+          const res = util.bfs(sim.grid, size, pos.r, pos.c);
+          const d = res.dist[targetCell.r][targetCell.c];
+          score = d >= 0 ? d
+            : size + Math.abs(targetCell.r - pos.r) + Math.abs(targetCell.c - pos.c);
+        }
+        options.push({ pt: pt, rot: rot, score: score });
+      }
+    }
+    options.sort(function (a, b) { return a.score - b.score; });
+    return options;
+  }
+
+  function chooseMove(maze, bot) {
+    const d = DIFFS[bot.difficulty];
+    let targetKey = bot.target;
+    let confused = false;
+
+    if (Math.random() < d.vergisst) {
+      confused = true;
+      const keys = [];
+      for (let r = 0; r < maze.size; r++) for (let c = 0; c < maze.size; c++) {
+        if (maze.grid[r][c].item) keys.push(maze.grid[r][c].item);
+      }
+      if (keys.length) targetKey = keys[Math.floor(Math.random() * keys.length)];
+    }
+
+    const options = evaluateMoves(maze, bot, targetKey);
+    let pick;
+    if (Math.random() < d.zufall) {
+      // Fehlgriff: irgendeine Stelle aus der schlechteren Hälfte
+      const von = Math.floor(options.length * (bot.difficulty === 'anfaenger' ? 0 : 0.2));
+      pick = options[von + Math.floor(Math.random() * (options.length - von))];
+    } else {
+      const top = Math.max(1, Math.round(options.length * 0.08));
+      pick = options[Math.floor(Math.random() * top)];
+    }
+    pick.confused = confused;
+    pick.targetKey = targetKey;
+    return pick;
+  }
+
+  /** Weg nach dem Schieben; bei Bedarf zum nächstgelegenen erreichbaren Feld */
+  function planPath(maze, bot, targetKey) {
+    const size = maze.size;
+    const res = maze.bfs(bot.cell.r, bot.cell.c);
+    const targetCell = maze.findItem(targetKey);
+    const d = DIFFS[bot.difficulty];
+
+    if (targetCell && res.dist[targetCell.r][targetCell.c] >= 0) {
+      const full = util.pathTo(res.prev, targetCell.r, targetCell.c, bot.cell.r, bot.cell.c);
+      if (!full) return null;
+      if (Math.random() < d.abbruch && full.length > 3) {
+        return full.slice(0, Math.max(2, Math.floor(full.length * (0.4 + Math.random() * 0.4))));
+      }
+      return full;
+    }
+    if (!targetCell) return null;
+
+    let best = null, bestD = Infinity;
+    for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) {
+      if (res.dist[r][c] < 0) continue;
+      const dist = Math.abs(r - targetCell.r) + Math.abs(c - targetCell.c);
+      if (dist < bestD) { bestD = dist; best = { r: r, c: c }; }
+    }
+    if (!best) return null;
+    return util.pathTo(res.prev, best.r, best.c, bot.cell.r, bot.cell.c);
+  }
+
+  LAB.COLORS = COLORS;
+  LAB.DIFFS = DIFFS;
+  LAB.Player = Player;
+  LAB.bot = { chooseMove: chooseMove, planPath: planPath, evaluateMoves: evaluateMoves };
+})(window.LAB);
+
+</script>
+<script>
+/* ==== js/scene.js ==== */
+/* =========================================================================
+   scene.js  –  3D-Darstellung mit Three.js
+   -------------------------------------------------------------------------
+   Alles prozedural: Steintexturen, Karten, Wände, Figuren, Symbole.
+   Zum Austauschen gegen echte Modelle genügen buildTile(), createItemMesh()
+   und createFigure().
+   ========================================================================= */
+window.LAB = window.LAB || {};
+(function (LAB) {
+  'use strict';
+
+  const TILE = 4;
+  const WALL_H = 4.6;      // hoch genug, dass man in der Ego-Sicht nicht darüber schaut
+  const WALL_T = 0.6;
+  const FLOOR_H = 0.4;
+  const CLEAR = 1.02;
+  const EYE = 1.72;
+
+  /* ----------------------------- Tweens ---------------------------------- */
+  const tweens = [];
+  function easeInOut(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+
+  function tweenVec(vec, to, dur, ease) {
+    return new Promise(function (res) {
+      tweens.push({
+        t: 0, dur: dur, ease: ease || easeInOut, done: res,
+        from: vec.clone(), to: to.clone(),
+        apply: function (k) { vec.lerpVectors(this.from, this.to, k); }
+      });
+    });
+  }
+  function tweenNum(obj, key, to, dur, ease) {
+    return new Promise(function (res) {
+      tweens.push({
+        t: 0, dur: dur, ease: ease || easeInOut, done: res,
+        from: obj[key], to: to,
+        apply: function (k) { obj[key] = this.from + (this.to - this.from) * k; }
+      });
+    });
+  }
+  function updateTweens(dt) {
+    for (let i = tweens.length - 1; i >= 0; i--) {
+      const tw = tweens[i];
+      tw.t += dt;
+      const k = Math.min(1, tw.t / tw.dur);
+      tw.apply(tw.ease(k));
+      if (k >= 1) { tweens.splice(i, 1); tw.done(); }
+    }
+  }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  /* --------------------------- Texturen ---------------------------------- */
+  function canvasOf(size, fn) {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = size;
+    fn(cv.getContext('2d'), size);
+    return cv;
+  }
+
+  function makeWallTexture() {
+    const cv = canvasOf(256, function (ctx, s) {
+      ctx.fillStyle = '#3c3630';
+      ctx.fillRect(0, 0, s, s);
+      const rows = 9, h = s / rows;
+      for (let r = 0; r < rows; r++) {
+        let x = -(r % 2) * 26;
+        while (x < s) {
+          const w = 34 + Math.random() * 26;
+          const shade = 92 + Math.random() * 46;
+          ctx.fillStyle = 'rgb(' + Math.round(shade * 1.05) + ',' + Math.round(shade * 0.97) + ',' + Math.round(shade * 0.85) + ')';
+          ctx.fillRect(x + 2, r * h + 2, w - 4, h - 4);
+          for (let n = 0; n < 12; n++) {
+            ctx.fillStyle = 'rgba(0,0,0,' + (Math.random() * 0.15).toFixed(3) + ')';
+            ctx.fillRect(x + 2 + Math.random() * (w - 8), r * h + 2 + Math.random() * (h - 8), 4, 3);
+          }
+          ctx.fillStyle = 'rgba(255,240,210,0.10)';
+          ctx.fillRect(x + 2, r * h + 2, w - 4, 2);
+          x += w;
+        }
+      }
+      for (let n = 0; n < 90; n++) {
+        ctx.fillStyle = 'rgba(70,86,58,' + (Math.random() * 0.18).toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.arc(Math.random() * s, Math.random() * s, 3 + Math.random() * 9, 0, 6.3);
+        ctx.fill();
+      }
+    });
+    const tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+  }
+
+  function makeFloorTexture() {
+    const cv = canvasOf(256, function (ctx, s) {
+      ctx.fillStyle = '#2b2621';
+      ctx.fillRect(0, 0, s, s);
+      const cells = 4, g = s / cells;
+      for (let y = 0; y < cells; y++) for (let x = 0; x < cells; x++) {
+        const shade = 70 + Math.random() * 40;
+        ctx.fillStyle = 'rgb(' + Math.round(shade * 1.06) + ',' + Math.round(shade) + ',' + Math.round(shade * 0.85) + ')';
+        ctx.fillRect(x * g + 3, y * g + 3, g - 6, g - 6);
+        for (let n = 0; n < 16; n++) {
+          ctx.fillStyle = 'rgba(0,0,0,' + (Math.random() * 0.12).toFixed(3) + ')';
+          ctx.fillRect(x * g + 4 + Math.random() * (g - 10), y * g + 4 + Math.random() * (g - 10), 5, 4);
+        }
+      }
+    });
+    const tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+  }
+
+  function makeEmojiSprite(emoji, size) {
+    const cv = canvasOf(128, function (ctx, s) {
+      ctx.clearRect(0, 0, s, s);
+      ctx.font = '92px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(emoji, s / 2, s / 2 + 6);
+    });
+    const tex = new THREE.CanvasTexture(cv);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+    sp.scale.set(size, size, size);
+    return sp;
+  }
+
+  /* ------------------------------ Szene ----------------------------------- */
+
+  class Scene3D {
+    constructor(container) {
+      this.container = container;
+      this.size = 7;
+      this.scene = new THREE.Scene();
+      this.scene.background = new THREE.Color(0x090a10);
+      this.scene.fog = new THREE.FogExp2(0x0b0d15, 0.011);
+
+      this.camera = new THREE.PerspectiveCamera(64, 1, 0.1, 500);
+      this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      this.renderer.shadowMap.enabled = true;
+      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      container.appendChild(this.renderer.domElement);
+
+      this.wallTex = makeWallTexture();
+      this.floorTex = makeFloorTexture();
+      this.wallMat = new THREE.MeshStandardMaterial({
+        map: this.wallTex, bumpMap: this.wallTex, bumpScale: 0.14,
+        roughness: 0.95, metalness: 0.02, color: 0xb9b2a4
+      });
+      this.floorMat = new THREE.MeshStandardMaterial({
+        map: this.floorTex, bumpMap: this.floorTex, bumpScale: 0.08,
+        roughness: 1.0, color: 0x9c948a
+      });
+      this.wallGeo = new THREE.BoxGeometry(TILE, WALL_H, WALL_T);
+      this.floorGeo = new THREE.BoxGeometry(TILE, FLOOR_H, TILE);
+
+      this.board = new THREE.Group();
+      this.scene.add(this.board);
+      this.tileMeshes = new Map();
+      this.slots = [];
+      this.helpers = new THREE.Group();
+      this.scene.add(this.helpers);
+      this.bursts = [];
+      this.helperTimer = 0;
+      this.beacons = [];
+      this.beaconGroup = new THREE.Group();
+      this.scene.add(this.beaconGroup);
+
+      this._setupLights();
+      this._setupCamera();
+      this._buildHighlight();
+      // Die Renderschleife läuft schon im Menü, also muss der Pfeil hier
+      // existieren – nicht erst beim Aufbau des Spielfelds.
+      this._buildPushArrow();
+      this._ray = new THREE.Raycaster();
+
+      window.addEventListener('resize', this.resize.bind(this));
+      this.resize();
+    }
+
+    _setupLights() {
+      this.scene.add(new THREE.HemisphereLight(0x5c6a8a, 0x201a14, 0.5));
+      this.scene.add(new THREE.AmbientLight(0x8899bb, 0.3));
+      const sun = new THREE.DirectionalLight(0xffe6bd, 0.8);
+      sun.position.set(20, 46, 16);
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(2048, 2048);
+      sun.shadow.camera.near = 1;
+      sun.shadow.camera.far = 140;
+      this.sun = sun;
+      this.scene.add(sun);
+      this.torchLights = [];
+      this.torchSprites = [];
+      for (let i = 0; i < 4; i++) {
+        const l = new THREE.PointLight(0xffa347, 1.4, 34, 2);
+        this.scene.add(l);
+        this.torchLights.push(l);
+        const f = makeEmojiSprite('🔥', 1.8);
+        this.scene.add(f);
+        this.torchSprites.push(f);
+      }
+    }
+
+    _setupCamera() {
+      this.camMode = 'top';
+      this.topAzimuth = 0;
+      this.topZoom = 1;
+      this.topDistBase = 50;
+      this.topHeight = 0.86;
+      this.yaw = 0;
+      this.pitch = -0.05;
+      this.lookAt = new THREE.Vector3(0, 0, 0);
+      this.camTween = null;
+      this.focus = null;
+      this.camera.position.set(0, 44, 36);
+      this.camera.lookAt(this.lookAt);
+    }
+
+    resize() {
+      const w = this.container.clientWidth || window.innerWidth;
+      const h = this.container.clientHeight || window.innerHeight;
+      this.camera.aspect = w / h;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(w, h);
+      this._frameBoard();
+    }
+
+    /** Kameraabstand so wählen, dass Feld und Ablage ins Bild passen –
+     *  auf schmalen Geräten ist das waagerechte Sichtfeld deutlich kleiner. */
+    _frameBoard() {
+      const halb = this.size * TILE / 2;
+      const breite = halb + TILE * 2.4;  // Rand für Ablage und Einschubfelder
+      const vFov = this.camera.fov * Math.PI / 180;
+      const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
+      const need = Math.max(breite / Math.tan(hFov / 2), (halb + TILE * 1.6) / Math.tan(vFov / 2));
+      this.topDistBase = Math.max(30, Math.min(260, need * 1.1));
+      this.parkPos = new THREE.Vector3(-(halb + TILE * 1.7), 0.6, -(halb + TILE * 1.7));
+      const d = halb + TILE;
+      const sh = this.sun.shadow.camera;
+      sh.left = -d; sh.right = d; sh.top = d; sh.bottom = -d;
+      sh.updateProjectionMatrix();
+      const corners = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+      for (let i = 0; i < 4; i++) {
+        const p = new THREE.Vector3(corners[i][0] * (halb - TILE), 4.2, corners[i][1] * (halb - TILE));
+        this.torchLights[i].position.copy(p);
+        this.torchSprites[i].position.copy(p);
+      }
+    }
+
+    /* --------------------- Weltkoordinaten ------------------------------- */
+    worldOf(r, c) {
+      const half = (this.size - 1) / 2;
+      return new THREE.Vector3((c - half) * TILE, 0, (r - half) * TILE);
+    }
+    cellOf(x, z) {
+      const half = this.size / 2;
+      return { c: Math.floor(x / TILE + half), r: Math.floor(z / TILE + half) };
+    }
+
+    /* ------------------------ Aufbau ------------------------------------- */
+
+    build(maze) {
+      this.maze = maze;
+      this.size = maze.size;
+      this._frameBoard();
+      while (this.board.children.length) this.board.remove(this.board.children[0]);
+      this.tileMeshes.clear();
+
+      for (let r = 0; r < maze.size; r++) {
+        for (let c = 0; c < maze.size; c++) {
+          const g = this.buildTile(maze.grid[r][c]);
+          const p = this.worldOf(r, c);
+          g.position.set(p.x, 0, p.z);
+          this.board.add(g);
+        }
+      }
+      this.looseGroup = this.buildTile(maze.loose);
+      this.looseGroup.position.copy(this.parkPos);
+      this.board.add(this.looseGroup);
+
+      this._buildSlots(maze);
+      this._buildPushArrow();
+    }
+
+    buildTile(tile) {
+      const g = new THREE.Group();
+      g.userData.tile = tile;
+
+      const floor = new THREE.Mesh(this.floorGeo, this.floorMat);
+      floor.position.y = -FLOOR_H / 2;
+      floor.receiveShadow = true;
+      g.add(floor);
+
+      const base = { L: [0, 1], I: [0, 2], T: [0, 1, 2], X: [0, 1, 2, 3] }[tile.type];
+      const off = TILE / 2 - WALL_T / 2;
+      for (let d = 0; d < 4; d++) {
+        if (base.indexOf(d) !== -1) continue;
+        const w = new THREE.Mesh(this.wallGeo, this.wallMat);
+        w.castShadow = true; w.receiveShadow = true;
+        w.position.y = WALL_H / 2;
+        if (d === 0) w.position.z = -off;
+        else if (d === 2) w.position.z = off;
+        else if (d === 1) { w.position.x = off; w.rotation.y = Math.PI / 2; }
+        else { w.position.x = -off; w.rotation.y = Math.PI / 2; }
+        g.add(w);
+      }
+
+      const holder = new THREE.Group();
+      g.add(holder);
+      g.userData.holder = holder;
+      if (tile.item) holder.add(this.createItemMesh(tile.item));
+
+      g.rotation.y = -tile.rot * Math.PI / 2;
+      holder.rotation.y = tile.rot * Math.PI / 2;
+      this.tileMeshes.set(tile.id, g);
+      return g;
+    }
+
+    createItemMesh(key) {
+      const item = LAB.itemByKey(key);
+      const g = new THREE.Group();
+      g.userData.itemKey = key;
+
+      const base = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.85, 1.0, 0.35, 12),
+        new THREE.MeshStandardMaterial({ color: 0x6b6358, roughness: 0.9 }));
+      base.position.y = 0.17; base.receiveShadow = true; base.castShadow = true;
+      g.add(base);
+
+      const gem = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.55, 0),
+        new THREE.MeshStandardMaterial({
+          color: item.color, emissive: item.color, emissiveIntensity: 0.7,
+          roughness: 0.25, metalness: 0.3, flatShading: true
+        }));
+      gem.position.y = 1.0; gem.castShadow = true;
+      g.add(gem);
+      g.userData.gem = gem;
+
+      const halo = new THREE.Mesh(
+        new THREE.RingGeometry(0.9, 1.25, 24),
+        new THREE.MeshBasicMaterial({ color: item.color, transparent: true, opacity: 0.3, side: THREE.DoubleSide }));
+      halo.rotation.x = -Math.PI / 2; halo.position.y = 0.05;
+      g.add(halo);
+
+      const sp = makeEmojiSprite(item.emoji, 1.6);
+      sp.position.y = 2.2;
+      g.add(sp);
+      return g;
+    }
+
+    createFigure(colorHex, name) {
+      const g = new THREE.Group();
+      const mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.55, metalness: 0.15 });
+      const dark = new THREE.MeshStandardMaterial({ color: 0x2a2b33, roughness: 0.8 });
+
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.55, 0.95, 12), mat);
+      body.position.y = 1.05; body.castShadow = true; g.add(body);
+
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.36, 16, 12),
+        new THREE.MeshStandardMaterial({ color: 0xe8d3b6, roughness: 0.7 }));
+      head.position.y = 1.78; head.castShadow = true; g.add(head);
+
+      const hat = new THREE.Mesh(new THREE.ConeGeometry(0.46, 0.6, 12), mat);
+      hat.position.y = 2.15; hat.castShadow = true; g.add(hat);
+
+      const nose = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.22, 8), dark);
+      nose.position.set(0, 1.75, -0.34); nose.rotation.x = -Math.PI / 2; g.add(nose);
+
+      const legs = [];
+      for (let i = 0; i < 2; i++) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.62, 0.24), dark);
+        leg.position.set(i === 0 ? -0.2 : 0.2, 0.31, 0);
+        leg.castShadow = true;
+        g.add(leg); legs.push(leg);
+      }
+      g.userData.legs = legs;
+      g.userData.walkPhase = 0;
+
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.86, 24),
+        new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.75, side: THREE.DoubleSide }));
+      ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03;
+      g.add(ring);
+
+      if (name) {
+        const cv = canvasOf(256, function (ctx, s) {
+          ctx.clearRect(0, 0, s, s);
+          ctx.font = 'bold 44px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = 'rgba(0,0,0,0.6)';
+          ctx.fillRect(8, 94, s - 16, 64);
+          ctx.fillStyle = '#f4e6c8';
+          ctx.fillText(name, s / 2, 140);
+        });
+        const label = new THREE.Sprite(new THREE.SpriteMaterial({
+          map: new THREE.CanvasTexture(cv), transparent: true, depthTest: false
+        }));
+        label.scale.set(3.6, 3.6, 1);
+        // über der Mauerkrone, damit man die Figuren von oben findet
+        label.position.y = WALL_H + 1.4;
+        g.add(label);
+        g.userData.label = label;
+      }
+      this.scene.add(g);
+      return g;
+    }
+
+    /* -------------------- Kartenmarkierung unter dem Zeiger ---------------- */
+
+    /** Rahmen aus vier schmalen Balken – schwebt flach über der Mauerkrone
+     *  der Karte und wandert als Kind der Kartengruppe mit ihr mit. */
+    _buildHighlight() {
+      const g = new THREE.Group();
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xe23b3b, transparent: true, opacity: 0.95, depthTest: false
+      });
+      const lang = new THREE.BoxGeometry(TILE, 0.14, 0.24);
+      const quer = new THREE.BoxGeometry(0.24, 0.14, TILE);
+      const halb = TILE / 2 - 0.11;
+      const teile = [
+        [lang, 0, -halb], [lang, 0, halb], [quer, -halb, 0], [quer, halb, 0]
+      ];
+      teile.forEach(function (t) {
+        const m = new THREE.Mesh(t[0], mat);
+        // oberhalb der Wände, damit der Rahmen von oben frei liegt
+        m.position.set(t[1], WALL_H + 0.35, t[2]);
+        m.renderOrder = 5;
+        m.userData.nichtTreffen = true;
+        g.add(m);
+      });
+      g.visible = false;
+      this.highlight = g;
+    }
+
+    /** Kartengruppe unter dem Zeiger, auch die lose Karte */
+    tileAt(clientX, clientY) {
+      const treffer = this._cast(clientX, clientY, this.board.children, true);
+      for (let i = 0; i < treffer.length; i++) {
+        let o = treffer[i].object;
+        if (o.userData.nichtTreffen) continue;
+        while (o && !o.userData.tile) o = o.parent;
+        if (o) return o;
+      }
+      return null;
+    }
+
+    highlightTile(group) {
+      const h = this.highlight;
+      if (!group) { h.visible = false; if (h.parent) h.parent.remove(h); return; }
+      if (h.parent !== group) group.add(h);
+      h.visible = true;
+    }
+
+    /* ------------------ Einschubfelder und Bestätigungspfeil --------------- */
+
+    _slotCell(pt) {
+      if (pt.side === 'left') return { r: pt.index, c: -1 };
+      if (pt.side === 'right') return { r: pt.index, c: this.size };
+      if (pt.side === 'top') return { r: -1, c: pt.index };
+      return { r: this.size, c: pt.index };
+    }
+
+    _buildSlots(maze) {
+      const self = this;
+      this.slots.forEach(function (s) { self.scene.remove(s); });
+      this.slots = [];
+      const geo = new THREE.BoxGeometry(TILE * 0.92, 0.18, TILE * 0.92);
+      maze.insertionPoints().forEach(function (pt) {
+        const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+          color: 0x8a6d2c, emissive: 0x2a1d06, transparent: true, opacity: 0.55, roughness: 0.6
+        }));
+        const cell = self._slotCell(pt);
+        const p = self.worldOf(cell.r, cell.c);
+        m.position.set(p.x, 0.1, p.z);
+        m.userData.pt = pt;
+        self.scene.add(m);
+        self.slots.push(m);
+      });
+    }
+
+    _buildPushArrow() {
+      if (this.pushArrow) this.scene.remove(this.pushArrow);
+      const geo = new THREE.ConeGeometry(1.0, 2.2, 4);
+      geo.rotateX(Math.PI / 2); // Spitze nach +z, damit lookAt passt
+      const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+        color: 0x59d98a, emissive: 0x14512f, emissiveIntensity: 0.8, roughness: 0.4
+      }));
+      m.visible = false;
+      this.pushArrow = m;
+      this.scene.add(m);
+    }
+
+    setSlotsVisible(v) {
+      this.slots.forEach(function (s) { s.visible = v; });
+      if (!v && this.pushArrow) this.pushArrow.visible = false;
+    }
+
+    /** Färbt die Felder: gesperrt rot, gewählt hell, Tipp grün */
+    refreshSlots(maze, selectedId, hintPt) {
+      this.slots.forEach(function (s) {
+        const pt = s.userData.pt;
+        const blocked = maze.isBlocked(pt);
+        const sel = selectedId === pt.id;
+        const hint = hintPt && hintPt.id === pt.id;
+        s.userData.blocked = blocked;
+        s.material.color.setHex(blocked ? 0x6a2f2f : (hint ? 0x59d98a : (sel ? 0xf0d590 : 0x8a6d2c)));
+        s.material.opacity = blocked ? 0.35 : (sel || hint ? 0.9 : 0.5);
+      });
+    }
+
+    /** Pfeil neben dem gewählten Feld, der ins Labyrinth zeigt */
+    showPushArrow(pt) {
+      const cell = this._slotCell(pt);
+      const p = this.worldOf(cell.r, cell.c);
+      const inward = { x: 0, z: 0 };
+      if (pt.side === 'left') inward.x = 1;
+      else if (pt.side === 'right') inward.x = -1;
+      else if (pt.side === 'top') inward.z = 1;
+      else inward.z = -1;
+      this.pushArrow.position.set(p.x - inward.x * TILE * 0.95, 1.4, p.z - inward.z * TILE * 0.95);
+      this.pushArrow.lookAt(p.x + inward.x, 1.4, p.z + inward.z);
+      this.pushArrow.visible = true;
+      this.pushArrow.userData.pt = pt;
+    }
+    hidePushArrow() { if (this.pushArrow) this.pushArrow.visible = false; }
+
+    /* --------------------------- Zeigerhilfen ----------------------------- */
+
+    _ndc(clientX, clientY) {
+      const rect = this.renderer.domElement.getBoundingClientRect();
+      return new THREE.Vector2(
+        ((clientX - rect.left) / rect.width) * 2 - 1,
+        -((clientY - rect.top) / rect.height) * 2 + 1);
+    }
+    _cast(clientX, clientY, objects, recursive) {
+      this._ray.setFromCamera(this._ndc(clientX, clientY), this.camera);
+      return this._ray.intersectObjects(objects, !!recursive);
+    }
+    /** Punkt auf der Bodenebene unter dem Zeiger */
+    groundPoint(clientX, clientY) {
+      this._ray.setFromCamera(this._ndc(clientX, clientY), this.camera);
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.6);
+      const out = new THREE.Vector3();
+      return this._ray.ray.intersectPlane(plane, out) ? out : null;
+    }
+    hitLoose(clientX, clientY) {
+      return this._cast(clientX, clientY, [this.looseGroup], true).length > 0;
+    }
+    hitSlot(clientX, clientY) {
+      const h = this._cast(clientX, clientY, this.slots, false);
+      return h.length ? h[0].object.userData.pt : null;
+    }
+    hitPushArrow(clientX, clientY) {
+      if (!this.pushArrow || !this.pushArrow.visible) return null;
+      const h = this._cast(clientX, clientY, [this.pushArrow], false);
+      return h.length ? this.pushArrow.userData.pt : null;
+    }
+    /** Nächstgelegenes Einschubfeld zu einem Weltpunkt */
+    nearestSlot(point, maxDist) {
+      let best = null, bestD = Infinity;
+      this.slots.forEach(function (s) {
+        if (s.userData.blocked) return;
+        const d = Math.hypot(s.position.x - point.x, s.position.z - point.z);
+        if (d < bestD) { bestD = d; best = s.userData.pt; }
+      });
+      return bestD <= (maxDist || TILE * 1.2) ? best : null;
+    }
+
+    /* --------------------- Lose Karte bewegen ------------------------------ */
+
+    rotateLoose(tile) {
+      tile.rotate(1);
+      const g = this.looseGroup;
+      g.userData.holder.rotation.y = tile.rot * Math.PI / 2;
+      return tweenNum(g.rotation, 'y', -tile.rot * Math.PI / 2, 0.28, easeOut);
+    }
+    dragLooseTo(x, z) {
+      this.looseGroup.position.set(x, 0.9, z);
+    }
+    snapLooseTo(pt) {
+      const cell = this._slotCell(pt);
+      const p = this.worldOf(cell.r, cell.c);
+      return tweenVec(this.looseGroup.position, new THREE.Vector3(p.x, 0.35, p.z), 0.25, easeOut);
+    }
+    parkLoose() {
+      return tweenVec(this.looseGroup.position, this.parkPos.clone(), 0.35, easeOut);
+    }
+
+    async animatePush(info, figureMoves) {
+      const self = this;
+      const insGroup = this.tileMeshes.get(info.inserted.id);
+      const ejGroup = this.tileMeshes.get(info.ejected.id);
+      const entry = info.moved.filter(function (m) { return m.tile === info.inserted; })[0];
+      const start = this.worldOf(entry.from.r, entry.from.c);
+
+      await tweenVec(insGroup.position, new THREE.Vector3(start.x, 0, start.z), 0.25, easeOut);
+
+      const anims = info.moved.map(function (m) {
+        const g = self.tileMeshes.get(m.tile.id);
+        const to = self.worldOf(m.to.r, m.to.c);
+        return tweenVec(g.position, new THREE.Vector3(to.x, 0, to.z), 0.8, easeInOut);
+      });
+      figureMoves.forEach(function (fm) {
+        const to = self.worldOf(fm.to.r, fm.to.c);
+        anims.push(tweenVec(fm.mesh.position, new THREE.Vector3(to.x, 0, to.z), 0.8, easeInOut));
+      });
+      await Promise.all(anims);
+
+      this.looseGroup = ejGroup;
+      await tweenVec(ejGroup.position, this.parkPos.clone(), 0.5, easeInOut);
+    }
+
+    /* ------------------------ Kamera -------------------------------------- */
+
+    _targetView() {
+      const pos = new THREE.Vector3(), look = new THREE.Vector3();
+      if (this.camMode === 'top' || !this.focus) {
+        const a = this.topAzimuth, d = this.topDistBase * this.topZoom;
+        pos.set(Math.sin(a) * d * 0.42, d * this.topHeight, Math.cos(a) * d * 0.46);
+        look.set(-TILE * 0.4, 0, -TILE * 0.4);
+      } else {
+        const p = this.focus.mesh.position;
+        const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+        pos.set(p.x + fwd.x * 0.1, EYE, p.z + fwd.z * 0.1);
+        look.set(pos.x + fwd.x * 6, EYE + Math.tan(this.pitch) * 6, pos.z + fwd.z * 6);
+      }
+      return { pos: pos, look: look };
+    }
+
+    switchCamera(mode, duration) {
+      this.camMode = mode;
+      this.camTween = {
+        t: 0, dur: duration || 1.4,
+        fromPos: this.camera.position.clone(),
+        fromLook: this.lookAt.clone()
+      };
+    }
+
+    updateCamera(dt) {
+      const tv = this._targetView();
+      if (this.camTween) {
+        const tw = this.camTween;
+        tw.t += dt;
+        const k = easeInOut(Math.min(1, tw.t / tw.dur));
+        this.camera.position.lerpVectors(tw.fromPos, tv.pos, k);
+        this.lookAt.lerpVectors(tw.fromLook, tv.look, k);
+        if (tw.t >= tw.dur) this.camTween = null;
+      } else if (this.camMode === 'play') {
+        this.camera.position.lerp(tv.pos, Math.min(1, dt * 16));
+        this.lookAt.lerp(tv.look, Math.min(1, dt * 20));
+      } else {
+        this.camera.position.copy(tv.pos);
+        this.lookAt.copy(tv.look);
+      }
+      this.camera.lookAt(this.lookAt);
+    }
+
+    /* ------------------------ Kollision ----------------------------------- */
+    canBeAt(maze, x, z) {
+      const cell = this.cellOf(x, z);
+      if (!maze.inside(cell.r, cell.c)) return false;
+      const center = this.worldOf(cell.r, cell.c);
+      const lx = x - center.x, lz = z - center.z, half = TILE / 2;
+      const dist = [half + lz, half - lx, half - lz, half + lx];
+      for (let d = 0; d < 4; d++) {
+        if (!maze.openEdge(cell.r, cell.c, d) && dist[d] < CLEAR) return false;
+      }
+      return true;
+    }
+
+    /* ------------------------ Hilfsanzeigen ------------------------------- */
+    clearHelpers() {
+      while (this.helpers.children.length) this.helpers.remove(this.helpers.children[0]);
+    }
+    showPath(cells, seconds) {
+      this.clearHelpers();
+      const self = this;
+      const mat = new THREE.MeshBasicMaterial({ color: 0x7ff0d0, transparent: true, opacity: 0.9 });
+      cells.forEach(function (cell, i) {
+        const p = self.worldOf(cell.r, cell.c);
+        const dot = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), mat);
+        dot.position.set(p.x, 0.6, p.z);
+        dot.userData.phase = i * 0.35;
+        self.helpers.add(dot);
+      });
+      this.helperTimer = seconds;
+    }
+    showHint(fromMesh, targetCell, seconds) {
+      this.clearHelpers();
+      const geo = new THREE.ConeGeometry(0.35, 1.1, 8);
+      geo.rotateX(Math.PI / 2);
+      const arrow = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xffd166 }));
+      arrow.userData.followMesh = fromMesh;
+      arrow.userData.target = this.worldOf(targetCell.r, targetCell.c);
+      this.helpers.add(arrow);
+      this.helperTimer = seconds;
+    }
+    burst(position, colorHex) {
+      const group = new THREE.Group();
+      const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+      for (let i = 0; i < 26; i++) {
+        const p = new THREE.Mesh(new THREE.TetrahedronGeometry(0.16), mat);
+        p.position.copy(position);
+        p.userData.v = new THREE.Vector3((Math.random() - 0.5) * 6, 2 + Math.random() * 5, (Math.random() - 0.5) * 6);
+        group.add(p);
+      }
+      group.userData.life = 1.4;
+      this.scene.add(group);
+      this.bursts.push(group);
+    }
+
+    /* ------------------------ Leuchtsäulen -------------------------------- */
+
+    /** Senkrechte Lichtsäule wie bei einem Leuchtfeuer: außen weicher
+     *  Schein, innen ein heller Kern. */
+    _makeBeacon() {
+      const g = new THREE.Group();
+      const aussen = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.55, 0.55, 90, 10, 1, true),
+        new THREE.MeshBasicMaterial({
+          color: 0xffffff, transparent: true, opacity: 0.16,
+          side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
+        }));
+      const kern = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.16, 0.16, 90, 8, 1, true),
+        new THREE.MeshBasicMaterial({
+          color: 0xffffff, transparent: true, opacity: 0.5,
+          side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
+        }));
+      aussen.position.y = 45; kern.position.y = 45;
+      g.add(aussen); g.add(kern);
+      g.userData.teile = [aussen, kern];
+      this.beaconGroup.add(g);
+      this.beacons.push(g);
+      return g;
+    }
+
+    /** entries: [{x, z, color, stark}] – der Pool wächst nach Bedarf */
+    updateBeacons(entries) {
+      while (this.beacons.length < entries.length) this._makeBeacon();
+      for (let i = 0; i < this.beacons.length; i++) {
+        const b = this.beacons[i], e = entries[i];
+        if (!e) { b.visible = false; continue; }
+        b.visible = true;
+        b.position.set(e.x, 0, e.z);
+        b.userData.teile[0].material.color.setHex(e.color);
+        b.userData.teile[1].material.color.setHex(e.color);
+        b.userData.teile[0].material.opacity = e.stark ? 0.22 : 0.13;
+        b.userData.teile[1].material.opacity = e.stark ? 0.6 : 0.4;
+      }
+    }
+
+    /* ------------------------ Frame --------------------------------------- */
+    update(dt, time) {
+      updateTweens(dt);
+
+      this.tileMeshes.forEach(function (g) {
+        const h = g.userData.holder;
+        if (h && h.children.length) {
+          const it = h.children[0];
+          if (it.userData.gem) {
+            it.userData.gem.rotation.y += dt * 1.1;
+            it.userData.gem.position.y = 1.0 + Math.sin(time * 2 + g.position.x) * 0.12;
+          }
+        }
+      });
+
+      this.slots.forEach(function (s, i) {
+        s.position.y = 0.1 + Math.sin(time * 2.2 + i) * 0.05;
+      });
+      if (this.pushArrow && this.pushArrow.visible) {
+        this.pushArrow.position.y = 1.4 + Math.sin(time * 4) * 0.16;
+      }
+      this.torchLights.forEach(function (l, i) {
+        l.intensity = 1.2 + Math.sin(time * 9 + i * 2.1) * 0.22 + Math.random() * 0.08;
+      });
+
+      if (this.helperTimer > 0) {
+        this.helperTimer -= dt;
+        this.helpers.children.forEach(function (h) {
+          if (h.userData.followMesh) {
+            const m = h.userData.followMesh, t = h.userData.target;
+            h.position.set(m.position.x, 3.0 + Math.sin(time * 3) * 0.14, m.position.z);
+            h.lookAt(t.x, h.position.y, t.z);
+          } else {
+            h.position.y = 0.6 + Math.sin(time * 4 + (h.userData.phase || 0)) * 0.16;
+          }
+        });
+        if (this.helperTimer <= 0) this.clearHelpers();
+      }
+
+      for (let i = this.bursts.length - 1; i >= 0; i--) {
+        const b = this.bursts[i];
+        b.userData.life -= dt;
+        b.children.forEach(function (p) {
+          p.userData.v.y -= 9.8 * dt;
+          p.position.addScaledVector(p.userData.v, dt);
+          p.rotation.x += dt * 5; p.rotation.y += dt * 4;
+        });
+        if (b.userData.life <= 0) { this.scene.remove(b); this.bursts.splice(i, 1); }
+      }
+
+      this.updateCamera(dt);
+      this.renderer.render(this.scene, this.camera);
+    }
+
+    animateWalk(mesh, moving, dt) {
+      const legs = mesh.userData.legs;
+      if (!legs) return;
+      if (moving) {
+        mesh.userData.walkPhase += dt * 11;
+        legs[0].position.z = Math.sin(mesh.userData.walkPhase) * 0.3;
+        legs[1].position.z = -Math.sin(mesh.userData.walkPhase) * 0.3;
+      } else {
+        legs[0].position.z *= 0.85; legs[1].position.z *= 0.85;
+      }
+    }
+  }
+
+  LAB.TILE = TILE;
+  LAB.WALL_H = WALL_H;
+  LAB.Scene3D = Scene3D;
+  LAB.tween = { vec: tweenVec, num: tweenNum, wait: wait, easeInOut: easeInOut, easeOut: easeOut };
+})(window.LAB);
+
+</script>
+<script>
+/* ==== js/ui.js ==== */
+/* =========================================================================
+   ui.js  –  Oberfläche, Eingaben, Sound
+   -------------------------------------------------------------------------
+   Steuerungsarten (im Menü unter „Steuerung“):
+     dual  – Touch: links Laufjoystick, rechts Drehjoystick
+     tank  – Touch: ein Joystick, vor/zurück läuft, links/rechts dreht
+     wasd  – Tastatur: WASD läuft, Maus dreht
+     wsad  – Tastatur: W/S läuft, A/D dreht
+   Joysticks erscheinen immer dort, wo der Finger aufsetzt.
+   ========================================================================= */
+window.LAB = window.LAB || {};
+(function (LAB) {
+  'use strict';
+
+  const $ = function (id) { return document.getElementById(id); };
+  const TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
+  /* ------------------------------ Sound ---------------------------------- */
+  const Sound = {
+    ctx: null, on: true,
+    ensure: function () {
+      if (!this.ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) this.ctx = new AC();
+      }
+      if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+      return this.ctx;
+    },
+    tone: function (freq, dur, type, gain, slideTo) {
+      const ctx = this.ensure();
+      if (!ctx || !this.on) return;
+      const osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.type = type || 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, ctx.currentTime + dur);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(gain || 0.16, ctx.currentTime + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+      osc.connect(g); g.connect(ctx.destination);
+      osc.start(); osc.stop(ctx.currentTime + dur + 0.02);
+    },
+    play: function (what) {
+      switch (what) {
+        case 'rotate': this.tone(420, 0.12, 'triangle', 0.10, 620); break;
+        case 'slide': this.tone(120, 0.55, 'sawtooth', 0.09, 70); break;
+        case 'snap': this.tone(300, 0.09, 'square', 0.07, 460); break;
+        case 'found':
+          this.tone(660, 0.18, 'triangle', 0.16);
+          setTimeout(function () { Sound.tone(880, 0.18, 'triangle', 0.16); }, 130);
+          setTimeout(function () { Sound.tone(1180, 0.35, 'triangle', 0.16); }, 260);
+          break;
+        case 'fail': this.tone(200, 0.28, 'square', 0.09, 120); break;
+        case 'coin': this.tone(980, 0.10, 'square', 0.08, 1320); break;
+        case 'click': this.tone(520, 0.06, 'square', 0.05); break;
+        case 'win':
+          [523, 659, 784, 1046].forEach(function (f, i) {
+            setTimeout(function () { Sound.tone(f, 0.4, 'triangle', 0.16); }, i * 160);
+          });
+          break;
+      }
+    }
+  };
+
+  /* ----------------------------- Eingaben --------------------------------- */
+  const Input = {
+    keys: {},
+    look: { x: 0, y: 0 },       // Maus-/Wischdrehung (sofortige Deltas)
+    stickMove: { x: 0, y: 0 },  // linker Joystick
+    stickTurn: { x: 0, y: 0 },  // rechter Joystick
+    mode: TOUCH ? 'dual' : 'wasd',
+    turnSpeed: 1,   // Faktor für Drehen (Joystick, Tasten und Maus)
+
+    setMode: function (m) { this.mode = m; },
+    setTurnSpeed: function (v) { this.turnSpeed = v; },
+
+    init: function (canvas, handlers) {
+      const self = this;
+      this.handlers = handlers;
+
+      window.addEventListener('keydown', function (e) {
+        self.keys[e.code] = true;
+        if (e.code === 'KeyR') handlers.onRotate();
+        if (e.code === 'KeyE') handlers.onConfirm();
+        if (e.code === 'Enter') handlers.onPush();
+        if (e.code === 'Space') { e.preventDefault(); handlers.onEndTurn(); }
+        if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].indexOf(e.code) !== -1) e.preventDefault();
+      });
+      window.addEventListener('keyup', function (e) { self.keys[e.code] = false; });
+      window.addEventListener('blur', function () { self.keys = {}; });
+
+      /* Zeiger auf der Leinwand (Vogelperspektive):
+         Der Spielzug darf den Zug beanspruchen – dann wird die lose Karte
+         gezogen statt die Kamera gedreht. */
+      let drag = false, claimed = false, lx = 0, ly = 0, moved = 0;
+      canvas.addEventListener('pointerdown', function (e) {
+        drag = true; moved = 0; lx = e.clientX; ly = e.clientY;
+        handlers.onHover(e.clientX, e.clientY);   // auch beim Tippen markieren
+        claimed = !!handlers.onDragStart(e.clientX, e.clientY);
+      });
+      canvas.addEventListener('pointermove', function (e) {
+        if (!drag) { handlers.onHover(e.clientX, e.clientY); return; }
+        const dx = e.clientX - lx, dy = e.clientY - ly;
+        lx = e.clientX; ly = e.clientY;
+        moved += Math.abs(dx) + Math.abs(dy);
+        if (claimed) handlers.onDragMove(e.clientX, e.clientY);
+        else { self.look.x += dx; self.look.y += dy; }
+      });
+      const up = function (e) {
+        if (!drag) return;
+        drag = false;
+        if (claimed) handlers.onDragEnd(e.clientX, e.clientY);
+        else if (moved < 8) handlers.onTap(e.clientX, e.clientY);
+        claimed = false;
+      };
+      canvas.addEventListener('pointerup', up);
+      canvas.addEventListener('pointercancel', function () { drag = false; claimed = false; });
+      canvas.addEventListener('pointerleave', function () { handlers.onHover(null, null); });
+      canvas.addEventListener('wheel', function (e) { handlers.onZoom(e.deltaY); }, { passive: true });
+
+      let pinch = 0;
+      canvas.addEventListener('touchmove', function (e) {
+        if (e.touches.length !== 2) { pinch = 0; return; }
+        const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY);
+        if (pinch) handlers.onZoom((pinch - d) * 2);
+        pinch = d;
+      }, { passive: true });
+      canvas.addEventListener('touchend', function () { pinch = 0; });
+
+      this._initTouchLayer();
+    },
+
+    _initTouchLayer: function () {
+      const self = this;
+      const layer = $('touch-layer');
+      const pads = {
+        move: { pad: $('joystick'), stick: $('stick'), id: null, ox: 0, oy: 0 },
+        turn: { pad: $('joystick2'), stick: $('stick2'), id: null, ox: 0, oy: 0 }
+      };
+      let lookId = null, lx = 0, ly = 0;
+      const RADIUS = 58;
+
+      const startPad = function (key, e) {
+        const p = pads[key];
+        p.id = e.pointerId; p.ox = e.clientX; p.oy = e.clientY;
+        p.pad.style.left = e.clientX + 'px';
+        p.pad.style.top = e.clientY + 'px';
+        p.pad.classList.remove('hidden');
+        p.stick.style.transform = 'translate(0,0)';
+      };
+      const movePad = function (key, e) {
+        const p = pads[key];
+        let dx = e.clientX - p.ox, dy = e.clientY - p.oy;
+        const len = Math.hypot(dx, dy);
+        if (len > RADIUS) { dx = dx / len * RADIUS; dy = dy / len * RADIUS; }
+        p.stick.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+        const v = key === 'move' ? self.stickMove : self.stickTurn;
+        v.x = dx / RADIUS; v.y = dy / RADIUS;
+      };
+      const endPad = function (key) {
+        const p = pads[key];
+        p.id = null;
+        p.pad.classList.add('hidden');
+        const v = key === 'move' ? self.stickMove : self.stickTurn;
+        v.x = 0; v.y = 0;
+      };
+
+      layer.addEventListener('pointerdown', function (e) {
+        const links = e.clientX < window.innerWidth * 0.5;
+        const maus = e.pointerType === 'mouse';
+        if (!maus && links && pads.move.id === null) startPad('move', e);
+        else if (!maus && !links && self.mode === 'dual' && pads.turn.id === null) startPad('turn', e);
+        else if (lookId === null) { lookId = e.pointerId; lx = e.clientX; ly = e.clientY; }
+        layer.setPointerCapture(e.pointerId);
+      });
+      layer.addEventListener('pointermove', function (e) {
+        if (e.pointerId === pads.move.id) movePad('move', e);
+        else if (e.pointerId === pads.turn.id) movePad('turn', e);
+        else if (e.pointerId === lookId) {
+          self.look.x += e.clientX - lx;
+          self.look.y += e.clientY - ly;
+          lx = e.clientX; ly = e.clientY;
+        }
+      });
+      const release = function (e) {
+        if (e.pointerId === pads.move.id) endPad('move');
+        else if (e.pointerId === pads.turn.id) endPad('turn');
+        else if (e.pointerId === lookId) lookId = null;
+      };
+      layer.addEventListener('pointerup', release);
+      layer.addEventListener('pointercancel', release);
+      this._pads = pads;
+    },
+
+    setMoveMode: function (on) {
+      $('touch-layer').classList.toggle('hidden', !on);
+      if (!on) {
+        this.stickMove.x = this.stickMove.y = 0;
+        this.stickTurn.x = this.stickTurn.y = 0;
+        $('joystick').classList.add('hidden');
+        $('joystick2').classList.add('hidden');
+      }
+    },
+
+    /** {x: seitwärts, y: vorwärts}, jeweils -1..1 */
+    moveVector: function () {
+      let x = 0, y = 0;
+      const pfeileLaufen = this.mode !== 'wasdArrows'; // dort drehen die Pfeile
+      if (this.keys['KeyW'] || (pfeileLaufen && this.keys['ArrowUp'])) y += 1;
+      if (this.keys['KeyS'] || (pfeileLaufen && this.keys['ArrowDown'])) y -= 1;
+      if (this.mode === 'wasd' || this.mode === 'wasdArrows') {
+        if (this.keys['KeyD'] || (pfeileLaufen && this.keys['ArrowRight'])) x += 1;
+        if (this.keys['KeyA'] || (pfeileLaufen && this.keys['ArrowLeft'])) x -= 1;
+      }
+      y -= this.stickMove.y;
+      if (this.mode !== 'tank') x += this.stickMove.x;
+      const len = Math.hypot(x, y);
+      if (len > 1) { x /= len; y /= len; }
+      return { x: x, y: y };
+    },
+
+    /** {x: drehen, y: neigen}, -1..1 */
+    turnVector: function () {
+      let x = 0, y = 0;
+      if (this.mode === 'wsad') {
+        if (this.keys['KeyD'] || this.keys['ArrowRight']) x += 1;
+        if (this.keys['KeyA'] || this.keys['ArrowLeft']) x -= 1;
+      }
+      if (this.mode === 'wasdArrows') {
+        if (this.keys['ArrowRight']) x += 1;
+        if (this.keys['ArrowLeft']) x -= 1;
+        if (this.keys['ArrowDown']) y += 1;
+        if (this.keys['ArrowUp']) y -= 1;
+      }
+      if (this.mode === 'tank') x += this.stickMove.x;
+      if (this.mode === 'dual') { x += this.stickTurn.x; y += this.stickTurn.y; }
+      x = Math.max(-1, Math.min(1, x)) * this.turnSpeed;
+      y = Math.max(-1, Math.min(1, y)) * this.turnSpeed;
+      return { x: x, y: y };
+    },
+
+    consumeLook: function () {
+      const l = { x: this.look.x * this.turnSpeed, y: this.look.y * this.turnSpeed };
+      this.look.x = 0; this.look.y = 0;
+      return l;
+    }
+  };
+
+  /* -------------------------------- UI ------------------------------------ */
+  const SPEICHER = 'wandernde-gaenge-v1';
+
+  const UI = {
+    touch: TOUCH,
+
+    /** Einstellungen im Browser ablegen – beim nächsten Start sind sie da. */
+    saveSettings: function () {
+      try {
+        const cfg = this.getConfig();
+        cfg.beacons = !!this.beacons;
+        window.localStorage.setItem(SPEICHER, JSON.stringify(cfg));
+      } catch (e) { /* z. B. privater Modus – dann eben ohne Speichern */ }
+    },
+    loadSettings: function () {
+      let cfg = null;
+      try {
+        const roh = window.localStorage.getItem(SPEICHER);
+        if (roh) cfg = JSON.parse(roh);
+      } catch (e) { cfg = null; }
+      if (!cfg) return false;
+
+      const setze = function (key, value) {
+        const grp = document.querySelector('.group[data-key="' + key + '"] .choice');
+        if (!grp) return;
+        let treffer = false;
+        Array.prototype.forEach.call(grp.children, function (b) {
+          const an = String(b.dataset.value) === String(value);
+          b.classList.toggle('on', an);
+          if (an) treffer = true;
+        });
+        if (!treffer && grp.children.length) grp.children[0].classList.add('on');
+      };
+      // Größen außerhalb der Kacheln landen in der freien Eingabe
+      const kacheln = ['7', '9', '11'];
+      if (cfg.size && kacheln.indexOf(String(cfg.size)) === -1) {
+        setze('size', 'frei');
+        $('free-size').value = cfg.size;
+      } else setze('size', cfg.size);
+      ['style', 'humans', 'bots', 'difficulty', 'goals', 'color', 'controls'].forEach(function (k) {
+        if (cfg[k] !== undefined && cfg[k] !== null) setze(k, cfg[k]);
+      });
+      if (cfg.walkSpeed) $('speed-walk').value = cfg.walkSpeed;
+      if (cfg.turnSpeed) $('speed-turn').value = cfg.turnSpeed;
+      this.beacons = cfg.beacons !== false;
+      return true;
+    },
+
+    init: function (handlers) {
+      const self = this;
+      this.h = handlers;
+      if (TOUCH) document.body.classList.add('touch');
+
+      // Farbkacheln
+      const cc = $('color-choice');
+      LAB.COLORS.forEach(function (c, i) {
+        const b = document.createElement('button');
+        b.dataset.value = i;
+        if (i === 0) b.className = 'on';
+        b.innerHTML = '<span class="swatch" style="background:' + c.css + ';color:' + c.css + '"></span><span>' + c.name + '</span>';
+        cc.appendChild(b);
+      });
+
+      // Vorauswahl der Steuerung passend zum Gerät
+      const stdMode = TOUCH ? 'dual' : 'wasd';
+      Array.prototype.forEach.call(document.querySelectorAll('.group[data-key="controls"] button'), function (b) {
+        b.classList.toggle('on', b.dataset.value === stdMode);
+      });
+      Input.setMode(stdMode);
+
+      // Alle Kachelgruppen
+      Array.prototype.forEach.call(document.querySelectorAll('.group .choice'), function (grp) {
+        grp.addEventListener('click', function (e) {
+          const b = e.target.closest('button');
+          if (!b || b.disabled) return;
+          Array.prototype.forEach.call(grp.children, function (x) { x.classList.remove('on'); });
+          b.classList.add('on');
+          Sound.play('click');
+          self._afterChoice(grp);
+        });
+      });
+
+      // Reiter
+      Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (t) {
+        t.addEventListener('click', function () {
+          Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (x) { x.classList.remove('on'); });
+          t.classList.add('on');
+          Array.prototype.forEach.call(document.querySelectorAll('.pane'), function (p) {
+            p.classList.toggle('hidden', p.dataset.pane !== t.dataset.tab);
+          });
+        });
+      });
+
+      const bind = function (id, fn) { $(id).addEventListener('click', fn); };
+      bind('btn-play', function () { Sound.ensure(); Sound.play('click'); self.h.onStart(self.getConfig()); });
+      bind('btn-help', function () { $('help-screen').classList.remove('hidden'); });
+      bind('btn-help-close', function () { $('help-screen').classList.add('hidden'); });
+      bind('btn-confirm', function () { self.h.onConfirm(); });
+      bind('btn-endturn', function () { self.h.onEndTurn(); });
+      bind('btn-rotate', function () { self.h.onRotate(); });
+      bind('btn-push', function () { self.h.onPush(); });
+      bind('btn-shop', function () { self.openShop(); });
+      bind('btn-shop-close', function () { self.closeShop(); });
+      bind('btn-pass-ok', function () { self.hidePass(); self.h.onPassOk(); });
+      bind('btn-restart', function () { location.reload(); });
+      bind('btn-sound', function () {
+        Sound.on = !Sound.on;
+        $('btn-sound').textContent = Sound.on ? '🔊' : '🔇';
+      });
+      $('free-size').addEventListener('input', function () { self._afterChoice(null); });
+
+      this.shopItems = [
+        { id: 'best', icon: '🔎', title: 'Beste Schiebestelle', price: 30, text: 'Hebt die Stelle hervor, die am weitesten bringt.' },
+        { id: 'path', icon: '🧭', title: 'Weg anzeigen', price: 25, text: 'Leuchtende Punkte zeigen 12 Sekunden den Weg.' },
+        { id: 'map', icon: '🗺️', title: 'Übersichtskarte', price: 15, text: 'Blendet 10 Sekunden eine Karte des Feldes ein.' },
+        { id: 'hint', icon: '👁️', title: 'Richtungspfeil', price: 10, text: 'Ein Pfeil zeigt die Richtung zum Ziel.' }
+      ];
+      ['speed-walk', 'speed-turn'].forEach(function (id) {
+        $(id).addEventListener('input', function () { self._afterChoice(null); });
+      });
+      bind('btn-beacon', function () { self.h.onBeacon(); });
+
+      this._buildShop();
+      this.beacons = true;
+      this.loadSettings();
+      this._afterChoice(null);
+    },
+
+    _afterChoice: function () {
+      // Zahl der Bots an die Zahl der Menschen anpassen (höchstens vier Figuren)
+      const humans = this._raw('humans');
+      const grp = document.querySelector('.group[data-key="bots"] .choice');
+      let weg = false;
+      Array.prototype.forEach.call(grp.children, function (b) {
+        const zuviel = humans + parseInt(b.dataset.value, 10) > 4;
+        b.disabled = zuviel;
+        if (zuviel && b.classList.contains('on')) { b.classList.remove('on'); weg = true; }
+      });
+      if (weg) {
+        for (let i = grp.children.length - 1; i >= 0; i--) {
+          if (!grp.children[i].disabled) { grp.children[i].classList.add('on'); break; }
+        }
+      }
+      // Freie Größe nur anzeigen, wenn gewählt
+      const frei = this._rawStr('size') === 'frei';
+      $('free-size-wrap').classList.toggle('hidden', !frei);
+
+      const cfg = this.getConfig();
+      Input.setMode(cfg.controls);
+      Input.setTurnSpeed(cfg.turnSpeed);
+      $('speed-walk-val').textContent = cfg.walkSpeed.toFixed(1).replace('.', ',');
+      $('speed-turn-val').textContent = Math.round(cfg.turnSpeed * 100) + ' %';
+      this.saveSettings();
+      const symbole = Math.min(LAB.ITEMS.length, Math.max(12, Math.round(cfg.size * cfg.size * 0.5)));
+      const noetig = (cfg.humans + cfg.bots) * cfg.goals;
+      $('cfg-info').textContent = cfg.size + ' × ' + cfg.size + ' Felder · ' + symbole +
+        ' Symbole im Labyrinth · ' + noetig + ' Zielkarten werden verteilt' +
+        (noetig > symbole ? ' – zu viele, die Zahl der Ziele wird gekürzt' : '');
+    },
+
+    _rawStr: function (key) {
+      const el = document.querySelector('.group[data-key="' + key + '"] .choice button.on');
+      return el ? el.dataset.value : null;
+    },
+    _raw: function (key) { return parseInt(this._rawStr(key), 10) || 0; },
+
+    getConfig: function () {
+      let size;
+      const s = this._rawStr('size');
+      if (s === 'frei') {
+        size = parseInt($('free-size').value, 10) || 9;
+        size = Math.max(5, Math.min(15, size));
+        if (size % 2 === 0) size += 1;   // ungerade Größen halten das Muster
+      } else size = parseInt(s, 10) || 7;
+
+      return {
+        size: size,
+        style: this._rawStr('style') || 'normal',
+        humans: this._raw('humans') || 1,
+        bots: this._raw('bots') || 2,
+        difficulty: this._rawStr('difficulty') || 'mittel',
+        goals: this._raw('goals') || 3,
+        color: this._raw('color') || 0,
+        controls: this._rawStr('controls') || (TOUCH ? 'dual' : 'wasd'),
+        walkSpeed: parseFloat($('speed-walk').value) || 7.2,
+        turnSpeed: parseFloat($('speed-turn').value) || 1,
+        beacons: this.beacons !== false
+      };
+    },
+
+    _buildShop: function () {
+      const list = $('shop-list'), self = this;
+      list.innerHTML = '';
+      this.shopItems.forEach(function (it) {
+        const el = document.createElement('button');
+        el.className = 'shop-item';
+        el.dataset.id = it.id;
+        el.innerHTML = '<span class="shop-icon">' + it.icon + '</span>' +
+          '<span class="shop-body"><b>' + it.title + '</b><span>' + it.text + '</span></span>' +
+          '<span class="shop-price">🪙 ' + it.price + '</span>';
+        el.addEventListener('click', function () {
+          if (el.disabled) return;
+          Sound.play('coin');
+          self.h.onBuy(it.id, it.price);
+        });
+        list.appendChild(el);
+      });
+    },
+
+    /* ---------------------------- Bildschirme ----------------------------- */
+    showStart: function () { $('start-screen').classList.remove('hidden'); },
+    hideStart: function () { $('start-screen').classList.add('hidden'); },
+    showPass: function (player) {
+      $('pass-name').textContent = player.name;
+      $('pass-name').style.color = player.color.css;
+      $('pass-screen').classList.remove('hidden');
+    },
+    hidePass: function () { $('pass-screen').classList.add('hidden'); },
+    showWin: function (player) {
+      $('win-text').innerHTML = '<span style="color:' + player.color.css + '">' +
+        player.name + '</span> hat alle Zeichen gefunden.';
+      $('win-screen').classList.remove('hidden');
+      Sound.play('win');
+    },
+    fatal: function (msg) {
+      $('error-text').textContent = msg;
+      $('error-screen').classList.remove('hidden');
+    },
+
+    /* ------------------------------- HUD ---------------------------------- */
+    setPlayer: function (p) {
+      $('p-name').textContent = p.name;
+      $('p-color').style.background = p.color.css;
+      $('p-color').style.color = p.color.css;
+      $('coins').textContent = p.coins;
+      const item = p.target ? LAB.itemByKey(p.target) : null;
+      $('goal-card').classList.toggle('secret', !!p.isBot);
+      $('goal-emoji').textContent = p.isBot ? '❓' : (item ? item.emoji : '🏁');
+      $('goal-name').textContent = p.isBot ? 'geheim' : (item ? item.name : 'alles gefunden');
+      let pips = '';
+      for (let i = 0; i < p.targets.length; i++) pips += '<i class="' + (i < p.targetIndex ? 'on' : '') + '"></i>';
+      $('goal-progress').innerHTML = pips;
+    },
+    setCoins: function (n) { $('coins').textContent = n; },
+
+    setBeaconButton: function (an) {
+      this.beacons = an;
+      const b = $('btn-beacon');
+      b.classList.toggle('aktiv', an);
+      b.title = an ? 'Leuchtsäulen aus' : 'Leuchtsäulen an';
+      this.saveSettings();
+    },
+
+    setPhase: function (text, sub) {
+      $('phase-banner').innerHTML = '<strong>' + text + '</strong>' + (sub ? '<span>' + sub + '</span>' : '');
+      $('phase-banner').classList.remove('hidden');
+    },
+    hidePhase: function () { $('phase-banner').classList.add('hidden'); },
+
+    setLooseLabel: function (x, y, text) {
+      const el = $('loose-label');
+      if (x === null) { el.classList.add('hidden'); return; }
+      el.textContent = text;
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      el.classList.remove('hidden');
+    },
+
+    setControls: function (mode) {
+      $('btn-rotate').classList.toggle('hidden', mode !== 'shift');
+      $('btn-push').classList.add('hidden');
+      $('btn-confirm').classList.toggle('hidden', mode !== 'move');
+      $('btn-endturn').classList.toggle('hidden', mode !== 'move');
+      $('btn-shop').classList.toggle('hidden', mode === 'watch');
+      $('btn-beacon').classList.remove('hidden');
+      $('timer').classList.toggle('hidden', mode !== 'move');
+      Input.setMoveMode(mode === 'move');
+      const hints = {
+        shift: TOUCH
+          ? 'Karte auf ein leuchtendes Feld ziehen, drehen, dann den grünen Pfeil antippen'
+          : 'Karte auf ein leuchtendes Feld ziehen · R dreht sie · grüner Pfeil oder Enter schiebt',
+        move: this._moveHint(),
+        watch: 'Die anderen sind am Zug'
+      };
+      $('hint-controls').textContent = hints[mode] || '';
+    },
+    _moveHint: function () {
+      switch (Input.mode) {
+        case 'dual': return 'Links halten und ziehen zum Laufen, rechts zum Drehen';
+        case 'tank': return 'Joystick: vor/zurück läuft, links/rechts dreht';
+        case 'wsad': return 'W/S laufen, A/D drehen · E bestätigt · Leertaste beendet den Zug';
+        default: return 'W A S D laufen, Maus ziehen dreht · E bestätigt · Leertaste beendet den Zug';
+      }
+    },
+    setPushReady: function (ready) {
+      $('btn-push').classList.toggle('hidden', !ready);
+    },
+
+    setTimer: function (sec) {
+      const t = $('timer');
+      t.textContent = Math.max(0, Math.ceil(sec));
+      t.classList.toggle('urgent', sec <= 8);
+    },
+
+    toast: function (text, kind) {
+      const t = $('toast');
+      t.textContent = text;
+      t.className = 'toast show ' + (kind || '');
+      clearTimeout(this._toastTimer);
+      this._toastTimer = setTimeout(function () { t.className = 'toast'; }, 2600);
+    },
+
+    /* ------------------------------- Laden -------------------------------- */
+    openShop: function () { Sound.play('click'); $('shop-modal').classList.remove('hidden'); this.h.onShopOpen(); },
+    closeShop: function () { $('shop-modal').classList.add('hidden'); },
+    updateShop: function (player, phase) {
+      $('shop-coins').textContent = player.coins;
+      const self = this;
+      Array.prototype.forEach.call(document.querySelectorAll('.shop-item'), function (el) {
+        const it = self.shopItems.filter(function (s) { return s.id === el.dataset.id; })[0];
+        let ok = player.coins >= it.price;
+        if (it.id === 'best' && phase !== 'shift') ok = false;
+        if (it.id === 'path' && phase !== 'move') ok = false;
+        el.disabled = !ok;
+      });
+    },
+
+    /* ----------------------------- Minikarte ------------------------------ */
+    showMinimap: function (maze, player, targetCell, seconds) {
+      const wrap = $('minimap-wrap');
+      wrap.classList.remove('hidden');
+      this.drawMinimap(maze, player, targetCell);
+      clearTimeout(this._mapTimer);
+      if (seconds) this._mapTimer = setTimeout(function () { wrap.classList.add('hidden'); }, seconds * 1000);
+    },
+    drawMinimap: function (maze, player, targetCell) {
+      const cv = $('minimap'), ctx = cv.getContext('2d');
+      const s = maze.size, cell = cv.width / s;
+      ctx.fillStyle = '#151821';
+      ctx.fillRect(0, 0, cv.width, cv.height);
+      const w = Math.max(1.5, cell * 0.1);
+      ctx.lineWidth = Math.max(2, cell * 0.16);
+      for (let r = 0; r < s; r++) for (let c = 0; c < s; c++) {
+        const t = maze.grid[r][c], x = c * cell, y = r * cell;
+        ctx.fillStyle = t.fixed ? '#3b4152' : '#2b3040';
+        ctx.fillRect(x + 1, y + 1, cell - 2, cell - 2);
+        ctx.strokeStyle = '#0d0f16';
+        ctx.beginPath();
+        if (!t.open(0)) { ctx.moveTo(x + w, y + w); ctx.lineTo(x + cell - w, y + w); }
+        if (!t.open(2)) { ctx.moveTo(x + w, y + cell - w); ctx.lineTo(x + cell - w, y + cell - w); }
+        if (!t.open(1)) { ctx.moveTo(x + cell - w, y + w); ctx.lineTo(x + cell - w, y + cell - w); }
+        if (!t.open(3)) { ctx.moveTo(x + w, y + w); ctx.lineTo(x + w, y + cell - w); }
+        ctx.stroke();
+        if (t.item) {
+          ctx.fillStyle = 'rgba(255,220,150,0.5)';
+          ctx.beginPath(); ctx.arc(x + cell / 2, y + cell / 2, cell * 0.14, 0, 6.3); ctx.fill();
+        }
+      }
+      if (targetCell) {
+        ctx.strokeStyle = '#ffd166';
+        ctx.strokeRect(targetCell.c * cell + 2, targetCell.r * cell + 2, cell - 4, cell - 4);
+      }
+      if (player) {
+        ctx.fillStyle = player.color.css;
+        ctx.beginPath();
+        ctx.arc(player.cell.c * cell + cell / 2, player.cell.r * cell + cell / 2, cell * 0.28, 0, 6.3);
+        ctx.fill();
+      }
+    },
+    hideMinimap: function () { $('minimap-wrap').classList.add('hidden'); }
+  };
+
+  LAB.$ = $;
+  LAB.UI = UI;
+  LAB.Input = Input;
+  LAB.Sound = Sound;
+})(window.LAB);
+
+</script>
+<script>
+/* ==== js/game.js ==== */
+/* =========================================================================
+   game.js  –  Spielablauf
+   -------------------------------------------------------------------------
+   Zug eines Menschen:
+     Vogelperspektive -> lose Karte auf ein Einschubfeld ziehen -> drehen
+     -> grünen Pfeil antippen -> Karten gleiten -> Kamera fährt in die
+     Ego-Sicht -> laufen -> Zeichen finden -> nächster Spieler
+   ========================================================================= */
+window.LAB = window.LAB || {};
+(function (LAB) {
+  'use strict';
+
+  const DIR_YAW = [0, -Math.PI / 2, Math.PI, Math.PI / 2];
+
+  const Game = {
+    state: 'menu',
+    players: [],
+    current: 0,
+    selectedSlot: null,
+
+    /* ----------------------------- Start ---------------------------------- */
+    init: function () {
+      const self = this;
+      this.scene = new LAB.Scene3D(LAB.$('canvas-wrap'));
+      this.clock = new THREE.Clock();
+
+      const handlers = {
+        onStart: function (cfg) { self.startGame(cfg); },
+        onRotate: function () { self.rotateLoose(); },
+        onConfirm: function () { self.confirmPosition(); },
+        onEndTurn: function () { self.endTurnByPlayer(); },
+        onPush: function () { self.pushSelected(); },
+        onTap: function (x, y) { self.tap(x, y); },
+        onDragStart: function (x, y) { return self.dragStart(x, y); },
+        onDragMove: function (x, y) { self.dragMove(x, y); },
+        onDragEnd: function (x, y) { self.dragEnd(x, y); },
+        onZoom: function (d) { self.zoom(d); },
+        onShopOpen: function () { LAB.UI.updateShop(self.human(), self.state); },
+        onBuy: function (id, price) { self.buy(id, price); },
+        onPassOk: function () { if (self._passResolve) { const r = self._passResolve; self._passResolve = null; r(); } },
+        onBeacon: function () { self.toggleBeacons(); },
+        onHover: function (x, y) { self.hover(x, y); }
+      };
+      LAB.UI.init(handlers);
+      LAB.Input.init(this.scene.renderer.domElement, handlers);
+
+      LAB.UI.showStart();
+      this.scene.renderer.setAnimationLoop(this.tick.bind(this));
+    },
+
+    startGame: function (cfg) {
+      LAB.UI.hideStart();
+      LAB.$('hud').classList.remove('hidden');
+
+      this.walkSpeed = cfg.walkSpeed || 7.2;
+      this.beaconsOn = cfg.beacons !== false;
+      LAB.UI.setBeaconButton(this.beaconsOn);
+      this.maze = new LAB.Maze(cfg.size, cfg.style);
+      this.scene.build(this.maze);
+      this.moveTime = 40 + (this.maze.size - 7) * 7;
+
+      const total = cfg.humans + cfg.bots;
+      const goals = Math.max(1, Math.min(cfg.goals, Math.floor(this.maze.itemCount / total)));
+
+      // Zielkarten aus den Symbolen ziehen, die wirklich im Feld liegen
+      const vorhanden = [];
+      for (let r = 0; r < this.maze.size; r++) for (let c = 0; c < this.maze.size; c++) {
+        if (this.maze.grid[r][c].item) vorhanden.push(this.maze.grid[r][c].item);
+      }
+      LAB.mazeUtil.shuffle(vorhanden);
+
+      const starts = LAB.mazeUtil.startCells(this.maze.size);
+      const pool = [0, 1, 2, 3].filter(function (i) { return i !== cfg.color; });
+      this.players = [];
+      let k = 0;
+      for (let i = 0; i < total; i++) {
+        const isBot = i >= cfg.humans;
+        const colorIndex = i === 0 ? cfg.color : pool.shift();
+        const name = isBot ? 'Bot ' + LAB.COLORS[colorIndex].name
+          : (cfg.humans > 1 ? 'Spieler ' + (i + 1) : 'Du');
+        const p = new LAB.Player({
+          id: i, name: name, colorIndex: colorIndex, isBot: isBot,
+          difficulty: cfg.difficulty, start: starts[i],
+          targets: vorhanden.slice(k, k + goals)
+        });
+        k += goals;
+        p.mesh = this.scene.createFigure(p.color.hex, isBot ? p.color.name : name);
+        const w = this.scene.worldOf(p.cell.r, p.cell.c);
+        p.mesh.position.set(w.x, 0, w.z);
+        this.players.push(p);
+      }
+
+      this.current = 0;
+      this.scene.focus = this.players[0];
+      this.scene.camMode = 'top';
+      this.humansCount = cfg.humans;
+      if (goals < cfg.goals) {
+        LAB.UI.toast('Für so viele Ziele reichen die Symbole nicht – es sind ' + goals + ' pro Spieler.', 'warn');
+      }
+      this.runGame();
+    },
+
+    human: function () {
+      const p = this.players[this.current];
+      if (p && !p.isBot) return p;
+      return this.players.filter(function (x) { return !x.isBot; })[0] || p;
+    },
+
+    /* --------------------------- Rundenschleife --------------------------- */
+    runGame: async function () {
+      while (this.state !== 'over') {
+        const p = this.players[this.current];
+        if (p.isBot) await this.botTurn(p);
+        else await this.humanTurn(p);
+
+        if (p.done) {
+          this.state = 'over';
+          LAB.UI.setControls('watch');
+          if (!p.isBot) { p.coins += 100; LAB.UI.setCoins(p.coins); }
+          LAB.UI.showWin(p);
+          return;
+        }
+        this.current = (this.current + 1) % this.players.length;
+      }
+    },
+
+    /* ---------------------------- Menschenzug ----------------------------- */
+    humanTurn: async function (p) {
+      const self = this, scene = this.scene;
+
+      if (this.humansCount > 1) {
+        await new Promise(function (res) { self._passResolve = res; LAB.UI.showPass(p); });
+      }
+
+      p.mesh.visible = true;
+      scene.focus = p;
+      LAB.UI.setPlayer(p);
+      LAB.UI.setControls('shift');
+      this.deselectSlot();
+      scene.setSlotsVisible(true);
+      scene.refreshSlots(this.maze, null);
+      scene.switchCamera('top', 1.2);
+      this.state = 'shift';
+      const item = LAB.itemByKey(p.target);
+      LAB.UI.setPhase('Karte einschieben', 'Dein Zeichen: ' + item.emoji + ' ' + item.name);
+
+      await new Promise(function (res) { self.pushResolve = res; });
+      this.pushResolve = null;
+
+      // Kamera fährt in die Ego-Sicht
+      scene.setSlotsVisible(false);
+      scene.highlightTile(null);
+      this.state = 'intro';
+      scene.yaw = this.facingYaw(p);
+      scene.pitch = -0.05;
+      scene.switchCamera('play', 1.7);
+      LAB.UI.setPhase('Du stehst hier', 'und schaust in diese Richtung');
+      await LAB.tween.wait(2200);
+      LAB.UI.hidePhase();
+
+      // Laufphase – nur Ego, der eigene Körper ist ausgeblendet
+      p.mesh.visible = false;
+      this.state = 'move';
+      this.timeLeft = this.moveTime;
+      LAB.UI.setControls('move');
+      LAB.UI.setTimer(this.timeLeft);
+      await new Promise(function (res) { self.turnResolve = res; });
+      this.turnResolve = null;
+
+      this.state = 'anim';
+      p.mesh.visible = true;
+      this.snapToCell(p);
+      LAB.UI.setControls('watch');
+      LAB.UI.hideMinimap();
+      scene.clearHelpers();
+      scene.switchCamera('top', 1.3);
+      await LAB.tween.wait(1000);
+    },
+
+    /* ------------------------------ Bot-Zug ------------------------------- */
+    botTurn: async function (p) {
+      const scene = this.scene;
+      this.state = 'bot';
+      scene.focus = p;
+      scene.setSlotsVisible(true);
+      scene.refreshSlots(this.maze, null);
+      scene.switchCamera('top', 1.0);
+      LAB.UI.setPlayer(p);
+      LAB.UI.setControls('watch');
+      LAB.UI.setPhase(p.name + ' ist am Zug', LAB.DIFFS[p.difficulty].label);
+
+      await LAB.tween.wait(500);
+      const move = LAB.bot.chooseMove(this.maze, p);
+      let guard = 0;
+      while (this.maze.loose.rot !== move.rot && guard++ < 4) {
+        LAB.Sound.play('rotate');
+        await scene.rotateLoose(this.maze.loose);
+      }
+      scene.refreshSlots(this.maze, move.pt.id);
+      await scene.snapLooseTo(move.pt);
+      scene.showPushArrow(move.pt);
+      await LAB.tween.wait(350);
+      scene.hidePushArrow();
+      await this.doPush(move.pt);
+      scene.setSlotsVisible(false);
+
+      const path = LAB.bot.planPath(this.maze, p, move.targetKey || p.target);
+      if (path && path.length > 1) await this.walkBot(p, path);
+
+      const t = this.maze.findItem(p.target);
+      if (t && t.r === p.cell.r && t.c === p.cell.c) {
+        this.succeed(p, false);
+        await LAB.tween.wait(1100);
+      } else await LAB.tween.wait(250);
+      LAB.UI.hidePhase();
+    },
+
+    walkBot: async function (p, path) {
+      const scene = this.scene;
+      const perCell = LAB.DIFFS[p.difficulty].tempo;
+      p.walking = true;
+      for (let i = 1; i < path.length; i++) {
+        const w = scene.worldOf(path[i].r, path[i].c);
+        p.mesh.rotation.y = Math.atan2(-(w.x - p.mesh.position.x), -(w.z - p.mesh.position.z));
+        await Promise.all([
+          LAB.tween.num(p.mesh.position, 'x', w.x, perCell, LAB.tween.easeInOut),
+          LAB.tween.num(p.mesh.position, 'z', w.z, perCell, LAB.tween.easeInOut)
+        ]);
+        p.cell = { r: path[i].r, c: path[i].c };
+      }
+      p.walking = false;
+    },
+
+    /** Karte unter dem Zeiger rot umranden – nur in der Übersicht */
+    hover: function (x, y) {
+      if (!this.maze || this.scene.camMode !== 'top' || x === null) {
+        this.scene.highlightTile(null);
+        return;
+      }
+      this.scene.highlightTile(this.scene.tileAt(x, y));
+    },
+
+    /* ------------------- Karte ziehen, drehen, einschieben ---------------- */
+    dragStart: function (x, y) {
+      if (this.state !== 'shift') return false;
+      if (!this.scene.hitLoose(x, y)) return false;
+      this.dragging = true;
+      this.scene.hidePushArrow();
+      return true;
+    },
+    dragMove: function (x, y) {
+      if (!this.dragging) return;
+      const p = this.scene.groundPoint(x, y);
+      if (!p) return;
+      this.scene.dragLooseTo(p.x, p.z);
+      const near = this.scene.nearestSlot(p);
+      this.scene.refreshSlots(this.maze, near ? near.id : null);
+    },
+    dragEnd: function (x, y) {
+      if (!this.dragging) return;
+      this.dragging = false;
+      const p = this.scene.groundPoint(x, y);
+      const near = p ? this.scene.nearestSlot(p) : null;
+      if (near) this.selectSlot(near);
+      else { this.deselectSlot(); this.scene.parkLoose(); }
+    },
+    tap: function (x, y) {
+      if (this.state !== 'shift') return;
+      if (this.scene.hitPushArrow(x, y)) { this.pushSelected(); return; }
+      const pt = this.scene.hitSlot(x, y);
+      if (pt) {
+        if (this.maze.isBlocked(pt)) {
+          LAB.Sound.play('fail');
+          LAB.UI.toast('Dieses Feld ist gesperrt – von dort kam der letzte Zug.', 'warn');
+          return;
+        }
+        this.selectSlot(pt);
+      }
+    },
+    selectSlot: function (pt) {
+      this.selectedSlot = pt;
+      LAB.Sound.play('snap');
+      this.scene.snapLooseTo(pt);
+      this.scene.refreshSlots(this.maze, pt.id);
+      this.scene.showPushArrow(pt);
+      LAB.UI.setPushReady(true);
+    },
+    deselectSlot: function () {
+      this.selectedSlot = null;
+      this.scene.hidePushArrow();
+      this.scene.refreshSlots(this.maze, null);
+      LAB.UI.setPushReady(false);
+    },
+    pushSelected: function () {
+      if (this.state !== 'shift' || !this.selectedSlot) return;
+      const pt = this.selectedSlot;
+      this.deselectSlot();
+      this.doPush(pt);
+    },
+    rotateLoose: function () {
+      if (this.state !== 'shift') return;
+      LAB.Sound.play('rotate');
+      this.scene.rotateLoose(this.maze.loose);
+    },
+
+    doPush: async function (pt) {
+      if (this.state === 'anim') return;
+      const prev = this.state;
+      this.state = 'anim';
+      LAB.Sound.play('slide');
+      LAB.UI.hidePhase();
+      LAB.UI.setPushReady(false);
+
+      const moves = [];
+      const self = this;
+      this.players.forEach(function (pl) {
+        const to = self.maze.shiftPosition(pt, pl.cell);
+        if (to.r !== pl.cell.r || to.c !== pl.cell.c) {
+          pl.cell = to;
+          moves.push({ mesh: pl.mesh, to: to });
+        }
+      });
+
+      const info = this.maze.push(pt);
+      await this.scene.animatePush(info, moves);
+      this.scene.refreshSlots(this.maze, null);
+
+      if (prev === 'shift' && this.pushResolve) {
+        this.state = 'shift';
+        const res = this.pushResolve;
+        this.pushResolve = null;
+        res();
+      } else this.state = prev;
+    },
+
+    /* ---------------------------- Laufphase ------------------------------- */
+    facingYaw: function (p) {
+      for (let d = 0; d < 4; d++) {
+        if (this.maze.openEdge(p.cell.r, p.cell.c, d)) return DIR_YAW[d];
+      }
+      return DIR_YAW[this.maze.tile(p.cell.r, p.cell.c).openDirs()[0]];
+    },
+
+    updateMovement: function (dt) {
+      const scene = this.scene, p = this.players[this.current];
+      const turn = LAB.Input.turnVector();
+      scene.yaw -= turn.x * dt * 2.6;
+      scene.pitch = Math.max(-0.55, Math.min(0.5, scene.pitch - turn.y * dt * 1.3));
+
+      const mv = LAB.Input.moveVector();
+      const moving = Math.abs(mv.x) + Math.abs(mv.y) > 0.05;
+      const fwd = { x: -Math.sin(scene.yaw), z: -Math.cos(scene.yaw) };
+      const right = { x: Math.cos(scene.yaw), z: -Math.sin(scene.yaw) };
+      const step = this.walkSpeed * dt;
+      const dx = (fwd.x * mv.y + right.x * mv.x) * step;
+      const dz = (fwd.z * mv.y + right.z * mv.x) * step;
+
+      const pos = p.mesh.position;
+      if (dx !== 0 && scene.canBeAt(this.maze, pos.x + dx, pos.z)) pos.x += dx;
+      if (dz !== 0 && scene.canBeAt(this.maze, pos.x, pos.z + dz)) pos.z += dz;
+      if (moving) p.mesh.rotation.y = scene.yaw;
+
+      const cell = scene.cellOf(pos.x, pos.z);
+      if (this.maze.inside(cell.r, cell.c)) p.cell = cell;
+
+      const t = this.maze.findItem(p.target);
+      if (t) {
+        const w = scene.worldOf(t.r, t.c);
+        if (Math.hypot(pos.x - w.x, pos.z - w.z) < 1.5) this.succeedAndEnd(p);
+      }
+
+      this.timeLeft -= dt;
+      LAB.UI.setTimer(this.timeLeft);
+      if (this.timeLeft <= 0) {
+        LAB.UI.toast('Die Zeit ist um – der Zug endet.', 'warn');
+        this.finishTurn();
+      }
+    },
+
+    confirmPosition: function () {
+      if (this.state !== 'move') return;
+      const p = this.players[this.current];
+      const t = this.maze.findItem(p.target);
+      const cell = this.scene.cellOf(p.mesh.position.x, p.mesh.position.z);
+      if (t && t.r === cell.r && t.c === cell.c) this.succeedAndEnd(p);
+      else {
+        LAB.Sound.play('fail');
+        LAB.UI.toast('Hier ist dein Zeichen nicht. Such weiter.', 'warn');
+      }
+    },
+    endTurnByPlayer: function () { if (this.state === 'move') this.finishTurn(); },
+
+    succeed: function (p, fast) {
+      const item = LAB.itemByKey(p.target);
+      const w = this.scene.worldOf(p.cell.r, p.cell.c);
+      this.scene.burst(new THREE.Vector3(w.x, 1.2, w.z), item.color);
+      LAB.Sound.play('found');
+      if (!p.isBot) { p.coins += 50 + (fast ? 25 : 0); LAB.UI.setCoins(p.coins); }
+      LAB.UI.toast(p.name + ' hat ' + item.emoji + ' ' + item.name + ' gefunden!', 'good');
+      p.foundTarget();
+      LAB.UI.setPlayer(p);
+    },
+    succeedAndEnd: function (p) {
+      if (this.state !== 'move') return;
+      const fast = this.timeLeft > this.moveTime * 0.5;
+      this.state = 'anim';
+      this.succeed(p, fast);
+      const self = this;
+      setTimeout(function () { self.state = 'move'; self.finishTurn(); }, 1100);
+    },
+    finishTurn: function () {
+      if (this.turnResolve) {
+        const res = this.turnResolve;
+        this.turnResolve = null;
+        this.state = 'anim';
+        res();
+      }
+    },
+    snapToCell: function (p) {
+      const cell = this.scene.cellOf(p.mesh.position.x, p.mesh.position.z);
+      if (this.maze.inside(cell.r, cell.c)) p.cell = cell;
+      const w = this.scene.worldOf(p.cell.r, p.cell.c);
+      LAB.tween.num(p.mesh.position, 'x', w.x, 0.25);
+      LAB.tween.num(p.mesh.position, 'z', w.z, 0.25);
+    },
+
+    /* ------------------------------- Laden -------------------------------- */
+    buy: function (id, price) {
+      const p = this.players[this.current];
+      if (p.isBot || p.coins < price) return;
+      const target = this.maze.findItem(p.target);
+
+      if (id === 'best') {
+        if (this.state !== 'shift') return;
+        const best = LAB.bot.evaluateMoves(this.maze, p, p.target)[0];
+        this.scene.refreshSlots(this.maze, this.selectedSlot ? this.selectedSlot.id : null, best.pt);
+        const turns = (best.rot - this.maze.loose.rot + 4) % 4;
+        LAB.UI.toast('Grün leuchtet die beste Stelle' + (turns ? ' – Karte ' + turns + '× drehen.' : '.'), 'good');
+      } else if (id === 'path') {
+        if (this.state !== 'move' || !target) return;
+        const res = this.maze.bfs(p.cell.r, p.cell.c);
+        const path = LAB.mazeUtil.pathTo(res.prev, target.r, target.c, p.cell.r, p.cell.c);
+        if (!path) { LAB.UI.toast('Von hier führt gerade kein Weg zum Ziel.', 'warn'); return; }
+        this.scene.showPath(path, 12);
+      } else if (id === 'map') {
+        LAB.UI.showMinimap(this.maze, p, target, 10);
+      } else if (id === 'hint') {
+        if (!target) { LAB.UI.toast('Dein Zeichen liegt gerade auf der losen Karte.', 'warn'); return; }
+        this.scene.showHint(p.mesh, target, 12);
+      }
+      p.coins -= price;
+      LAB.UI.setCoins(p.coins);
+      LAB.UI.updateShop(p, this.state);
+      LAB.UI.closeShop();
+    },
+
+    toggleBeacons: function () {
+      this.beaconsOn = !this.beaconsOn;
+      LAB.UI.setBeaconButton(this.beaconsOn);
+      LAB.UI.toast(this.beaconsOn
+        ? 'Leuchtsäulen an – sichtbar in der Übersicht'
+        : 'Leuchtsäulen aus');
+    },
+
+    /** Senkrechte Lichtsäulen über dem eigenen Ziel und über den Figuren */
+    updateBeacons: function () {
+      if (!this.maze) return;
+      const eintraege = [];
+      // In der Ego-Sicht wäre das Ziel sonst quer durchs Labyrinth sichtbar –
+      // die Säulen gibt es nur in der Übersicht.
+      const uebersicht = this.state !== 'move' && this.state !== 'intro';
+      if (this.beaconsOn && uebersicht) {
+        const akt = this.players[this.current];
+        if (akt && !akt.isBot && akt.target) {
+          const t = this.maze.findItem(akt.target);
+          if (t) {
+            const w = this.scene.worldOf(t.r, t.c);
+            eintraege.push({ x: w.x, z: w.z, color: LAB.itemByKey(akt.target).color, stark: true });
+          }
+        }
+        for (let i = 0; i < this.players.length; i++) {
+          const p = this.players[i];
+          eintraege.push({ x: p.mesh.position.x, z: p.mesh.position.z, color: p.color.hex, stark: false });
+        }
+      }
+      this.scene.updateBeacons(eintraege);
+    },
+
+    zoom: function (delta) {
+      if (this.scene.camMode !== 'top') return;
+      this.scene.topZoom = Math.max(0.5, Math.min(2.2, this.scene.topZoom + delta * 0.0012));
+    },
+
+    /* ------------------------------ Frame --------------------------------- */
+    tick: function () {
+      const dt = Math.min(0.05, this.clock.getDelta());
+      const time = this.clock.elapsedTime;
+      const look = LAB.Input.consumeLook();
+
+      if (this.state === 'move') {
+        this.scene.yaw -= look.x * 0.005;
+        this.scene.pitch = Math.max(-0.55, Math.min(0.5, this.scene.pitch - look.y * 0.003));
+        this.updateMovement(dt);
+      } else if (this.scene.camMode === 'top') {
+        this.scene.topAzimuth += look.x * 0.006;
+        this.scene.topHeight = Math.max(0.5, Math.min(1.2, this.scene.topHeight - look.y * 0.003));
+      }
+
+      for (let i = 0; i < this.players.length; i++) {
+        const p = this.players[i];
+        if (p.mesh) this.scene.animateWalk(p.mesh, p.walking, dt);
+      }
+
+      // Beschriftung an der losen Karte
+      if (this.state === 'shift' && this.scene.looseGroup) {
+        const v = this.scene.looseGroup.position.clone();
+        v.y += 3.4;
+        v.project(this.scene.camera);
+        if (v.z < 1) {
+          LAB.UI.setLooseLabel(
+            (v.x * 0.5 + 0.5) * window.innerWidth,
+            (-v.y * 0.5 + 0.5) * window.innerHeight,
+            this.selectedSlot ? 'Drehen oder grünen Pfeil antippen' : 'Diese Karte auf ein Feld ziehen');
+        } else LAB.UI.setLooseLabel(null);
+      } else LAB.UI.setLooseLabel(null);
+
+      this.updateBeacons();
+      this.scene.update(dt, time);
+    }
+  };
+
+  Game.boot = function () {
+    if (Game.booted || !window.THREE || !document.body) return;
+    Game.booted = true;
+    try { Game.init(); }
+    catch (err) { LAB.UI.fatal((err && err.stack) || String(err)); }
+  };
+
+  window.addEventListener('error', function (e) {
+    if (LAB.UI && LAB.UI.fatal) {
+      LAB.UI.fatal((e.error && e.error.stack) || (e.message + ' (' + e.filename + ':' + e.lineno + ')'));
+    }
+  });
+
+  window.addEventListener('DOMContentLoaded', function () {
+    Game.boot();
+    setTimeout(function () {
+      if (!Game.booted) {
+        LAB.UI.fatal('Die 3D-Bibliothek Three.js konnte nicht geladen werden. ' +
+          'Beim ersten Start wird eine Internetverbindung gebraucht.');
+      }
+    }, 8000);
+  });
+
+  LAB.Game = Game;
+})(window.LAB);
+
+</script>
+</body>
+</html>
